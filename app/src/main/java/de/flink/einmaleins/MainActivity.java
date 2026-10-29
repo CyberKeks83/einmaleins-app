@@ -57,5 +57,13 @@ public class MainActivity extends Activity {
    .setPositiveButton("Schließen",(dialog,which)->finish())
    .setNegativeButton("Weiterrechnen",null).show();
  }
+ @Override protected void onPause(){
+  if(webView!=null){webView.evaluateJavascript("if(window.FlinkAudio) window.FlinkAudio.background();",null);webView.onPause();}
+  super.onPause();
+ }
+ @Override protected void onResume(){
+  super.onResume();
+  if(webView!=null){webView.onResume();webView.evaluateJavascript("if(window.FlinkAudio) window.FlinkAudio.foreground();",null);}
+ }
  @Override public void onDestroy(){if(webView!=null)webView.destroy();super.onDestroy();}
 }

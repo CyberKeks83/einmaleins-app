@@ -34,3 +34,7 @@ Die Weboberfläche wurde mit einer vollständigen Runde einschließlich einer fa
 Faktoren 1 und 10 entfallen. Neue Runden speichern alle Antworten zur späteren Auswertung. Alte Runden besitzen keine nachträglich rekonstruierbaren Antwortdetails und zählen nicht in der Bestenliste der schwierigeren Aufgaben.
 
 Logikprüfung: `node --test tests/app.test.cjs`.
+
+## Version 1.2
+
+Originale, lokal synthetisierte Hintergrundmusik während der Runde und kurzer synthetisierter Applaus nach der 20. Antwort. Über den Tonknopf abschaltbar. Die Einstellung wird auf dem Gerät gespeichert. Beim Wechsel in den Hintergrund oder Abbruch verstummt der Ton. Keine Audiodownloads oder zusätzlichen Berechtigungen.
