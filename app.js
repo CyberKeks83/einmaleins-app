@@ -89,5 +89,5 @@ $('closePrivacy').onclick=()=>$('privacyDialog').close();
 $('eraseResults').onclick=()=>{
  if(!confirm('Alle gespeicherten Ergebnisse auf diesem Gerät unwiderruflich löschen?'))return;
  try{localStorage.removeItem(KEY);history=[];renderRecords();$('privacyMessage').textContent='Die gespeicherten Ergebnisse wurden gelöscht.';}
- catch{$('privacyMessage').textContent='Die Ergebnisse konnten nicht gelöscht werden. Bitte nutze die Android App Einstellungen.';}
+ catch{$('privacyMessage').textContent='Die Ergebnisse konnten nicht gelöscht werden. Bitte lösche die Website Daten in deinem Browser.';}
 };
