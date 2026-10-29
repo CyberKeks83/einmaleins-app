@@ -5,7 +5,7 @@ const fs=require('node:fs');
 function setup(stored='[]'){
  const elements=new Map(),memory=new Map([['flink-results-v1',stored]]);
  function el(){return {textContent:'',hidden:false,children:[],attrs:{},classList:{toggle(){},add(){},remove(){}},setAttribute(k,v){this.attrs[k]=v},replaceChildren(...v){this.children=v},append(...v){this.children.push(...v)},focus(){},showModal(){this.open=true},close(){this.open=false}}}
- const sounds=[];const context={FlinkAudio:{attach(){},startRound(){sounds.push('start')},finishRound(){sounds.push('finish')},stop(){sounds.push('stop')}},document:{getElementById(id){if(!elements.has(id))elements.set(id,el());return elements.get(id)},createElement:el,addEventListener(){}},localStorage:{getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v)},performance:{now:()=>1000},setInterval:()=>1,clearInterval(){},confirm:()=>true};
+ const sounds=[];const context={FlinkAudio:{attach(){},startRound(){sounds.push('start')},finishRound(){sounds.push('finish')},stop(){sounds.push('stop')}},document:{getElementById(id){if(!elements.has(id))elements.set(id,el());return elements.get(id)},createElement:el,addEventListener(){}},localStorage:{getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v),removeItem:k=>memory.delete(k)},performance:{now:()=>1000},setInterval:()=>1,clearInterval(){},confirm:()=>true};
  vm.createContext(context);vm.runInContext(fs.readFileSync('app/src/main/assets/app.js','utf8'),context);
  return {run:s=>vm.runInContext(s,context),memory,elements,sounds};
 }
@@ -39,4 +39,9 @@ test('music follows the round and applause only follows completion',()=>{
  c.run('value="0";key("Enter")');assert.deepEqual(c.sounds,['start']);
  c.run('for(let n=1;n<20;n++){value="0";key("Enter")}');assert.deepEqual(c.sounds,['start','finish']);
  c.run('start()');c.elements.get('cancel').onclick();assert.equal(c.sounds.at(-1),'stop');
+});
+
+test('privacy control deletes stored results',()=>{
+ const c=setup(JSON.stringify([{ms:1000,errors:0,correct:20,date:1}]));
+ c.elements.get('eraseResults').onclick();assert.equal(c.memory.has('flink-results-v1'),false);assert.equal(c.run('history.length'),0);
 });

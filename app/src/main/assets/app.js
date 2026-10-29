@@ -83,3 +83,11 @@ $('onlyWrong').onclick=()=>{reviewFilter='wrong';renderReview()};
 $('allAnswers').onclick=()=>{reviewFilter='all';renderReview()};
 $('closeReview').onclick=()=>$('reviewDialog').close();
 $('start').onclick=start;$('again').onclick=start;$('keypad').onclick=e=>{const b=e.target.closest('button');if(b)key(b.dataset.key)};document.addEventListener('keydown',e=>{if(!running||e.target.closest('dialog'))return;if(/^\d$/.test(e.key)||['Backspace','Enter'].includes(e.key)){if(e.key==='Enter'&&e.target.tagName==='BUTTON')return;e.preventDefault();if(!e.repeat)key(e.key)}});$('cancel').onclick=()=>{if(confirm('Diese Runde wirklich beenden? Sie wird nicht gespeichert.')){sound.stop();running=false;clearInterval(ticker);$('playing').hidden=true;$('welcome').hidden=false;$('progressLabel').textContent='Bereit, wenn du es bist.';index=0;paintDots();paintTime(0);}};$('bestTab').onclick=()=>{tab='best';renderRecords()};$('recentTab').onclick=()=>{tab='recent';renderRecords()};paintDots();renderRecords();
+
+$('openPrivacy').onclick=()=>{$('privacyMessage').textContent='';$('privacyDialog').showModal()};
+$('closePrivacy').onclick=()=>$('privacyDialog').close();
+$('eraseResults').onclick=()=>{
+ if(!confirm('Alle gespeicherten Ergebnisse auf diesem Gerät unwiderruflich löschen?'))return;
+ try{localStorage.removeItem(KEY);history=[];renderRecords();$('privacyMessage').textContent='Die gespeicherten Ergebnisse wurden gelöscht.';}
+ catch{$('privacyMessage').textContent='Die Ergebnisse konnten nicht gelöscht werden. Bitte nutze die Android App Einstellungen.';}
+};

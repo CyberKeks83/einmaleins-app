@@ -1,40 +1,41 @@
 # Flink Einmaleins
 
-Einfache Android App für das kleine Einmaleins. Funktioniert vollständig offline und ohne Anmeldung. Keine Internetberechtigung, keine Werbung und keine externen Datenübertragungen.
+Einfache Android App zum privaten Üben des kleinen Einmaleins, vollständig offline und ohne Anmeldung.
+
+Die aktuelle Weitergabeversion wird unter Releases als dauerhaft signierte APK veröffentlicht. Alte Versionen bis 1.2 sind Entwicklungsversionen und sollten nicht mehr verteilt werden.
 
 ## Funktionen
 
-* Genau 20 zufällige Aufgaben aus den Reihen 2 bis 9 je Runde
-* Jede bestätigte Antwort führt direkt zur nächsten Aufgabe
-* Auswertung erst nach 20 Antworten: richtig, falsch, Trefferquote, Gesamtzeit und Lösungen zu den Fehlern
+* Genau 20 Aufgaben pro Runde mit Faktoren 2 bis 9
+* Jede Antwort führt weiter. Auswertung nach 20 Antworten
+* Richtige und falsche Antworten, Trefferquote, Zeit und einzeln abrufbare Lösungen
+* Gespeicherte Runden mit Fehlerfilter und allen 20 Antworten
 * Zeitmesser bis einschließlich zwei Minuten grün, danach rot
-* Einzelne Runden lassen sich später erneut öffnen, mit Fehlerfilter und allen 20 Antworten
-* Die fünf besten fehlerfreien Runden unter zwei Minuten und die letzten fünf Runden werden lokal gespeichert
+* Lokale Hintergrundmusik, Applaus und gespeicherter Tonknopf
+* Datenschutzinfo und Löschen der gespeicherten Ergebnisse
 
-## APK herunterladen
+## Datenschutz und Sicherheit
 
-Nach einem erfolgreichen GitHub Actions Lauf steht unter Releases die Datei `Flink-Einmaleins.apk` bereit. Auf dem Android Gerät herunterladen und öffnen. Android kann dafür einmalig die Installation aus dieser Quelle abfragen.
+Keine Berechtigungen für Internet, Kontakte, Fotos, Kamera, Mikrofon, Standort oder gemeinsamen Speicher. Keine Werbung und keine Analysefunktionen. Bis zu 500 Runden mit Datum, Zeit, Ergebnissen und Antworten sowie die Toneinstellung werden in privaten App Daten gespeichert. Automatische Sicherungen und Gerätekopien sind ausgeschlossen. Die App fragt keine personenbezogenen Angaben ab.
 
-Dies ist eine persönlich nutzbare Testversion mit Debugsignatur. Der Schlüssel wird im Bauprozess erzeugt. Spätere Builds können eine andere Signatur haben und dann eine Deinstallation der bisherigen Version erfordern, bei der gespeicherte Ergebnisse verloren gehen. Für dauerhafte Updates ist vor weiteren Veröffentlichungen ein privater, dauerhaft aufbewahrter Signaturschlüssel erforderlich.
+Release APKs sind nicht debugfähig. WebView Debugging, Dateizugriffe, fremde Navigation und Cookies sind abgeschaltet. Eine Content Security Policy beschränkt die Oberfläche auf mitgelieferte Dateien. Der private Signaturschlüssel ist NICHT im Repository, in APKs oder in GitHub Actions enthalten. Nur das öffentliche Prüfzertifikat liegt unter `release/`.
 
-## Projekt bauen
+## Updates und Signierung
 
-Voraussetzungen: JDK 17, Gradle 8.11.1 und Android SDK 35.
+1. `versionCode` und `versionName` erhöhen und Code pushen.
+2. GitHub Actions baut und prüft die unsignierte Release APK. Das Artefakt enthält auch die offiziellen SDK Signierwerkzeuge.
+3. APK privat mit dem dauerhaft gesicherten Schlüssel signieren. Das Schlüsselarchiv niemals veröffentlichen.
+4. Die geprüfte signierte APK unter `downloads/Flink-Einmaleins-VERSION.apk` committen.
+5. GitHub Actions kontrolliert die Signatur, das Zertifikat, das kompilierte Manifest und den APK Inhalt gegen den eigenen Quellcodebuild. Nur bei Erfolg wird ein Release erstellt.
 
-`gradle :app:assembleDebug :app:lintDebug`
+Für Versionen bis 1.2 ist eine einmalige Deinstallation nötig. Ab 1.3 muss derselbe private Schlüssel für alle Updates verwendet werden. Ohne diesen Schlüssel sind keine regulären Updates möglich.
 
-Das GitHub Actions Verfahren richtet diese Werkzeuge automatisch ein. Der Nativeinstieg verwendet Android WebView mit lokalem WebViewAssetLoader. Die Weboberfläche befindet sich in `app/src/main/assets`.
+## Prüfen
 
-## Prüfstand
+`node --test tests/*.test.cjs`
 
-Die Weboberfläche wurde mit einer vollständigen Runde einschließlich einer falschen Antwort überprüft. Automatisierte Logikprüfungen decken leere Eingabe, falsche Antwort, exakt 20 Aufgaben, gemischte und vollständig richtige beziehungsweise falsche Runden, Auswertung und Speicherung ab. Der Android Bau und Gerätetest stehen bis zum ersten erfolgreichen Workflow Lauf aus.
+`gradle :app:assembleRelease :app:lintRelease`
 
-## Version 1.1
+`python scripts/verify_apk.py app/build/outputs/apk/release/app-release-unsigned.apk`
 
-Faktoren 1 und 10 entfallen. Neue Runden speichern alle Antworten zur späteren Auswertung. Alte Runden besitzen keine nachträglich rekonstruierbaren Antwortdetails und zählen nicht in der Bestenliste der schwierigeren Aufgaben.
-
-Logikprüfung: `node --test tests/app.test.cjs`.
-
-## Version 1.2
-
-Originale, lokal synthetisierte Hintergrundmusik während der Runde und kurzer synthetisierter Applaus nach der 20. Antwort. Über den Tonknopf abschaltbar. Die Einstellung wird auf dem Gerät gespeichert. Beim Wechsel in den Hintergrund oder Abbruch verstummt der Ton. Keine Audiodownloads oder zusätzlichen Berechtigungen.
+Voraussetzungen: JDK 17, Gradle 8.11.1, Android SDK 35. Es gibt keine Garantie vollständiger Sicherheit. Ein unabhängiger Penetrationstest und ein systematischer Gerätetest über unterschiedliche Hersteller liegen nicht vor.
