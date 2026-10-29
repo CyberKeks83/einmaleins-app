@@ -4,10 +4,11 @@ Einfache Android App für das kleine Einmaleins. Funktioniert vollständig offli
 
 ## Funktionen
 
-* Genau 20 zufällige Aufgaben von 1 × 1 bis 10 × 10 je Runde
+* Genau 20 zufällige Aufgaben aus den Reihen 2 bis 9 je Runde
 * Jede bestätigte Antwort führt direkt zur nächsten Aufgabe
 * Auswertung erst nach 20 Antworten: richtig, falsch, Trefferquote, Gesamtzeit und Lösungen zu den Fehlern
 * Zeitmesser bis einschließlich zwei Minuten grün, danach rot
+* Einzelne Runden lassen sich später erneut öffnen, mit Fehlerfilter und allen 20 Antworten
 * Die fünf besten fehlerfreien Runden unter zwei Minuten und die letzten fünf Runden werden lokal gespeichert
 
 ## APK herunterladen
@@ -27,3 +28,9 @@ Das GitHub Actions Verfahren richtet diese Werkzeuge automatisch ein. Der Native
 ## Prüfstand
 
 Die Weboberfläche wurde mit einer vollständigen Runde einschließlich einer falschen Antwort überprüft. Automatisierte Logikprüfungen decken leere Eingabe, falsche Antwort, exakt 20 Aufgaben, gemischte und vollständig richtige beziehungsweise falsche Runden, Auswertung und Speicherung ab. Der Android Bau und Gerätetest stehen bis zum ersten erfolgreichen Workflow Lauf aus.
+
+## Version 1.1
+
+Faktoren 1 und 10 entfallen. Neue Runden speichern alle Antworten zur späteren Auswertung. Alte Runden besitzen keine nachträglich rekonstruierbaren Antwortdetails und zählen nicht in der Bestenliste der schwierigeren Aufgaben.
+
+Logikprüfung: `node --test tests/app.test.cjs`.
