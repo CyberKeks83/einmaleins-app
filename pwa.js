@@ -1,7 +1,9 @@
 'use strict';
 (()=>{
- const CACHE='flink-web-1.3.0',status=document.getElementById('offlineStatus');
- let cached=false,installPrompt=null;
+ const CACHE='flink-web-1.4.0',status=document.getElementById('offlineStatus');
+ let cached=false,installPrompt=null,reloading=false;
+ const updateButton=document.getElementById('updateApp');
+ navigator.serviceWorker?.addEventListener('controllerchange',()=>{if(reloading)location.reload()});
  const paint=()=>{status.textContent=cached?'Offline bereit':navigator.onLine?'Offline Modus wird vorbereitet …':'Offline Modus noch nicht gespeichert';status.classList.toggle('ready',cached);};
  document.getElementById('installApp').onclick=async()=>{
   if(installPrompt){const prompt=installPrompt;installPrompt=null;try{await prompt.prompt();return}catch{}}
@@ -12,12 +14,14 @@
  globalThis.addEventListener('online',paint);globalThis.addEventListener('offline',paint);
  if(!('serviceWorker'in navigator)||!('caches'in globalThis)){status.textContent='Im Browser nutzbar · Offline Modus nicht verfügbar';return;}
  navigator.serviceWorker.register('./sw.js').then(reg=>{
-  const check=()=>{const worker=reg.installing;if(worker)worker.addEventListener('statechange',()=>{if(worker.state==='redundant')status.textContent='Offline Speichern fehlgeschlagen · bitte online erneut öffnen';});};
+  const offerUpdate=()=>{if(!reg.waiting||!navigator.serviceWorker.controller)return;updateButton.hidden=false;updateButton.onclick=()=>{if(document.getElementById('playing').hidden){reloading=true;reg.waiting?.postMessage({type:'ACTIVATE_UPDATE'})}else{updateButton.textContent='Update nach der Runde laden';}};};
+  offerUpdate();
+  const check=()=>{const worker=reg.installing;if(worker)worker.addEventListener('statechange',()=>{if(worker.state==='installed')offerUpdate();if(worker.state==='redundant')status.textContent='Offline Speichern fehlgeschlagen · bitte online erneut öffnen';});};
   check();reg.addEventListener('updatefound',check);
   return navigator.serviceWorker.ready;
  }).then(async()=>{
   const keys=await caches.keys();if(!keys.includes(CACHE))return;
-  const cache=await caches.open(CACHE);const needed=['index.html','style.css','app.js','audio.js','pwa.js','manifest.webmanifest','icon.svg','icon-180.png','icon-192.png','icon-512.png'];
+  const cache=await caches.open(CACHE);const needed=['index.html','style.css','app.js','tasks.js','audio.js','pwa.js','manifest.webmanifest','icon.svg','icon-180.png','icon-192.png','icon-512.png'];
   const matches=await Promise.all(needed.map(file=>cache.match(new URL(file,location.href))));cached=matches.every(Boolean);paint();
  }).catch(()=>{status.textContent='Im Browser nutzbar · Offline Speichern nicht verfügbar';});
 })();
