@@ -1,14 +1,10 @@
-Flink 1.3 ist die erste dauerhaft signierte Weitergabeversion.
+Flink 1.4 ergänzt Zahlenreihen bis 1000.
 
-* Debugmodus und WebView Debugging ausgeschaltet.
-* Keine Internetberechtigung und keine Zugriffe auf Kontakte, Fotos, Kamera, Mikrofon oder Standort.
-* Keine Werbung, Analysefunktionen oder Anmeldung. Musik und Applaus werden lokal erzeugt.
-* Ergebnisse bleiben auf dem jeweiligen Gerät. Datenschutzinfo und Löschfunktion sind in der App erreichbar.
-* Dauerhafte Signatur für spätere Updates. Automatische Sicherungen und Gerätekopien sind gesperrt.
-* Genau 20 Aufgaben mit Faktoren 2 bis 9, gespeicherte Auswertungen, Zeitmesser, Musik und Applaus.
+* Neue Auswahl zwischen Einmaleins und Zahlenreihen.
+* Vorwärts und rückwärts zählen, Reihen fortsetzen, Schrittweiten finden und die Mitte bestimmen.
+* Immer 20 Aufgaben. Bei Zahlenreihen zählt eine vollständige Reihe als eine Aufgabe.
+* Falsche Antworten führen weiter. Die Auswertung zeigt falsche Reihen, richtige Lösungen und die Anzahl richtig ausgefüllter Zahlen.
+* Bestzeiten und letzte Runden werden je Übung angezeigt. Vorhandene Ergebnisse bleiben erhalten.
+* Musik, Applaus und sämtliche Rechenergebnisse bleiben auf dem Gerät.
 
-Die bisherigen Versionen 1.0 bis 1.2 waren anders signierte Testversionen. Sie müssen einmalig deinstalliert werden, bevor 1.3 installiert werden kann. Dabei werden ihre Ergebnisse gelöscht. Spätere mit demselben Schlüssel signierte Updates können regulär installiert werden.
-
-Prüfumfang: automatisierte Funktionstests, Android Lint, Kontrolle des kompilierten Manifests, Signaturprüfung und Vergleich des signierten Inhalts mit dem Quellcodebuild. Kein unabhängiger Penetrationstest und keine Garantie vollständiger Fehlerfreiheit. Android und Android System WebView sollten aktuell gehalten werden.
-
-Download und Installation erfolgen über Androids normale Sicherheitsabfragen. Play Protect nicht deaktivieren.
+Android: Die dauerhaft signierte Version kann über Flink 1.3 installiert werden. Der Signaturschlüssel bleibt unverändert. Die APK benötigt keine Berechtigungen und funktioniert vollständig offline.

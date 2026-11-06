@@ -39,3 +39,8 @@ Für Versionen bis 1.2 ist eine einmalige Deinstallation nötig. Ab 1.3 muss der
 `python scripts/verify_apk.py app/build/outputs/apk/release/app-release-unsigned.apk`
 
 Voraussetzungen: JDK 17, Gradle 8.11.1, Android SDK 35. Es gibt keine Garantie vollständiger Sicherheit. Ein unabhängiger Penetrationstest und ein systematischer Gerätetest über unterschiedliche Hersteller liegen nicht vor.
+
+
+## Flink 1.4
+
+Zusätzlich zum Einmaleins gibt es Zahlenreihen bis 1000: fortsetzen, vorwärts und rückwärts zählen, Schrittweiten erkennen und Mittelpunkte bestimmen. 20 Aufgaben je Runde, getrennte Bestzeiten und eine Auswertung mit sämtlichen Lücken. Vorhandene lokale Ergebnisse und die Signatur bleiben erhalten.
