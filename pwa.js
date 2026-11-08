@@ -1,6 +1,6 @@
 'use strict';
 (()=>{
- const CACHE='flink-web-1.4.0',status=document.getElementById('offlineStatus');
+ const CACHE='flink-web-1.5.0',status=document.getElementById('offlineStatus');
  let cached=false,installPrompt=null,reloading=false;
  const updateButton=document.getElementById('updateApp');
  navigator.serviceWorker?.addEventListener('controllerchange',()=>{if(reloading)location.reload()});
