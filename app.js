@@ -2,20 +2,24 @@
 const $=id=>document.getElementById(id),MODE='2bis9-v1',KEY='flink-results-v1';
 let history=[],storageOK=true;try{history=JSON.parse(localStorage.getItem(KEY)||'[]');if(!Array.isArray(history))history=[];history=history.filter(r=>Number.isFinite(r.ms)&&r.ms>=0&&Number.isInteger(r.errors)&&r.errors>=0&&Number.isFinite(r.date));localStorage.setItem(KEY,JSON.stringify(history));}catch{history=[];storageOK=false;$('storageNotice').hidden=false;}
 let mode=MODE,entries=[],activeBlank=0,marked=[0,0,0];
+const EXAM='klassentest-v1';
+const gradeScale=[[30,'1'],[29,'1−'],[28,'1–2'],[27,'2+'],[26,'2'],[25,'2−'],[24,'2–3'],[23,'3+'],[22,'3'],[21,'3−'],[20,'3–4'],[19,'4+'],[18,'4'],[17,'4−'],[16,'4–5'],[15,'5+'],[13,'5'],[11,'5−'],[9,'5–6'],[0,'6']];
+function gradeFor(points){return gradeScale.find(([minimum])=>points>=minimum)[1];}
 const MODES = {
+ [EXAM]: {name:'Klassentest',count:30,minutes:20,art:'✎',intro:'10 Einmaleins, 5 Zahlenreihen, 10 Stellenwerte und 5 Tausenderbuch. Maximal 20 Minuten. Jede vollständig richtige Aufgabe gibt einen Punkt.'},
  '2bis9-v1': {name:'Kleines Einmaleins', count:20, minutes:2, art:'7 × 8 = ?', intro:'Gemischte Aufgaben aus den Reihen 2 bis 9.'},
  'zahlenreihen-v1': {name:'Zahlenreihen bis 1000', count:10, minutes:10, art:'398 · 399 · ?', intro:'Zähle vorwärts und rückwärts, ergänze Reihen und finde die Mitte.'},
  'tausenderbuch-v1': {name:'Tausenderbuch', count:10, minutes:10, art:'← ↑ ↓ →', intro:'Springe auf einer Hundertertafel. Ein Feld nach rechts bedeutet +1, ein Feld nach unten +10.'},
  'stellenwert-v1': {name:'Hunderter, Zehner, Einer', count:10, minutes:10, art:'H · Z · E', intro:'Lies und baue Zahlen aus roten Hundertern, blauen Zehnern und grünen Einern.'}
 };
 
-let responses=[],tasks=[],index=0,errors=0,value='',startTime=0,ticker=null,running=false,tab='best',reviewRound=null,reviewFilter='wrong';
+let responses=[],tasks=[],index=0,errors=0,value='',startTime=0,examDeadline=0,ticker=null,running=false,tab='best',reviewRound=null,reviewFilter='wrong';
 const sound=typeof FlinkAudio!=='undefined'?FlinkAudio:{attach(){},startRound(){},finishRound(){},stop(){}};
 sound.attach();
 const time=ms=>{const s=Math.floor(ms/1000);return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')};
-function paintTime(ms){$('time').textContent=time(ms);$('timer').classList.toggle('over',ms>timeLimit());$('timer').setAttribute('aria-label','Vergangene Zeit '+time(ms)+(ms>timeLimit()?', über '+limitMinutes()+' Minuten':''));}
+function paintTime(ms){if(mode===EXAM){const remaining=time(Math.ceil(Math.max(0,timeLimit()-ms)/1000)*1000);$('time').textContent=remaining;$('timer').classList.toggle('over',ms>=timeLimit());$('timer').setAttribute('aria-label','Verbleibende Zeit '+remaining);return;}$('time').textContent=time(ms);$('timer').classList.toggle('over',ms>timeLimit());$('timer').setAttribute('aria-label','Vergangene Zeit '+time(ms)+(ms>timeLimit()?', über '+limitMinutes()+' Minuten':''));}
 function paintDots(){const nodes=Array.from({length:roundCount()},(_,i)=>{const el=document.createElement('span');el.className='dot'+(i<index?' done':i===index&&running?' current':'');return el});$('dots').replaceChildren(...nodes);}
-function isSequence(){return mode==='zahlenreihen-v1';}
+function isSequence(){return Array.isArray(tasks[index]?.blanks);}
 function limitMinutes(){return MODES[mode].minutes;}
 function roundCount(){return MODES[mode].count;}
 function savedCount(round){return round.total ?? 20;}
@@ -23,7 +27,7 @@ function timeLimit(){return limitMinutes()*60_000;}
 function setMode(next){
  if(running)return;
  mode=next;
- for(const [id,key] of Object.entries({multiplyMode:MODE,sequenceMode:'zahlenreihen-v1',bookMode:'tausenderbuch-v1',placeMode:'stellenwert-v1'})){
+ for(const [id,key] of Object.entries({multiplyMode:MODE,sequenceMode:'zahlenreihen-v1',bookMode:'tausenderbuch-v1',placeMode:'stellenwert-v1',examMode:EXAM})){
   $(id).setAttribute('aria-pressed',String(mode===key));
  }
  const exercise=MODES[mode];
@@ -32,7 +36,10 @@ function setMode(next){
  $('welcomeText').textContent=exercise.count+' Aufgaben. '+exercise.intro;
  $('mathArt').textContent=exercise.art;
  $('finished').hidden=true;$('welcome').hidden=false;$('progressLabel').textContent='Bereit, wenn du es bist.';index=0;paintDots();paintTime(0);
- $('goalTime').textContent='Bis '+limitMinutes()+':00 grün';
+ $('goalTime').textContent=mode===EXAM?'Zeitlimit 20:00':'Bis '+limitMinutes()+':00 grün';
+ $('goalAfter').hidden=mode===EXAM;
+ $('examScale').hidden=mode!==EXAM;
+ $('gradeScale').textContent=gradeScale.map(([points,grade])=>points+' P.: '+grade).join(' · ');
  $('bestTimeLimit').textContent='unter '+limitMinutes()+' Min.';
  $('recordNote').textContent='Tippe auf eine Runde für die Auswertung. Für die Bestenliste brauchst du '+roundCount()+' richtige Aufgaben in weniger als '+limitMinutes()+' Minuten.';
  renderRecords();
@@ -50,6 +57,14 @@ function drawSequence(){
  $('feedback').textContent='Zahl '+(activeBlank+1)+' von '+task.blanks.length+' · Mit ✓ weiter.';
 }
 function drawBook(task){
+ const route=$('bookRoute');
+ route.hidden=task.inverse;
+ route.replaceChildren(...(task.inverse?[]:task.moves.map(move=>{
+  const step=document.createElement('span');
+  step.textContent=move.count+' '+move.arrow;
+  step.setAttribute('aria-label',move.count+' Felder nach '+move.name);
+  return step;
+ })));
  const grid=$('bookGrid');
  grid.replaceChildren();
  for(let n=task.first;n<task.first+100;n++){
@@ -134,25 +149,47 @@ function showQuestion(){
  $('progressLabel').textContent='Aufgabe '+(index+1)+' von '+roundCount();paintDots();
 }
 function start(){
- sound.startRound();tasks=FlinkTasks.make(mode);index=0;errors=0;responses=[];running=true;startTime=performance.now();
+ sound.startRound();tasks=FlinkTasks.make(mode);index=0;errors=0;responses=[];running=true;startTime=performance.now();examDeadline=Date.now()+timeLimit();
  $('modePicker').hidden=true;$('welcome').hidden=true;$('finished').hidden=true;$('playing').hidden=false;
- paintTime(0);showQuestion();clearInterval(ticker);ticker=setInterval(()=>paintTime(performance.now()-startTime),80);
+ paintTime(0);showQuestion();clearInterval(ticker);ticker=setInterval(()=>{if(!expireExam())paintTime(elapsed());},80);
  if(!$('answer').hidden)$('answer').focus({preventScroll:true});
 }
-function finish(){
- const ms=performance.now()-startTime,correct=roundCount()-errors;
+function elapsed(){
+ return mode===EXAM?Math.max(0,timeLimit()-(examDeadline-Date.now())):performance.now()-startTime;
+}
+function expireExam(){
+ if(!running||mode!==EXAM||Date.now()<examDeadline)return false;
+ for(const task of tasks.slice(index)){
+  if(Array.isArray(task.blanks)){
+   responses.push({numbers:task.numbers,blanks:task.blanks,answers:[],expected:task.blanks.map(i=>task.numbers[i]),correct:false,unanswered:true});
+  }else if(Array.isArray(task)){
+   responses.push({a:task[0],b:task[1],correct:false,unanswered:true});
+  }else{
+   responses.push({title:reviewTaskTitle(task),expected:task.expected,correct:false,unanswered:true});
+  }
+ }
+ finish(true);
+ return true;
+}
+function finish(timedOut=false){
+ const ms=timedOut?timeLimit():elapsed();
+ const unanswered=roundCount()-index;
+ const correct=index-errors;
  running=false;sound.finishRound();clearInterval(ticker);paintTime(ms);paintDots();
- $('playing').hidden=true;$('finished').hidden=false;$('modePicker').hidden=false;$('progressLabel').textContent=roundCount()+' von '+roundCount()+' beantwortet';
- const eligible=ms<timeLimit()&&errors===0;
+ $('playing').hidden=true;$('finished').hidden=false;$('modePicker').hidden=false;$('progressLabel').textContent=index+' von '+roundCount()+' beantwortet';
+ const eligible=ms<timeLimit()&&correct===roundCount();
  const oldBest=history.filter(r=>r.mode===mode&&savedCount(r)===roundCount()&&r.errors===0&&r.ms<timeLimit()).reduce((a,r)=>Math.min(a,r.ms),Infinity);
  $('finishTitle').textContent=eligible&&ms<oldBest?'Neue persönliche Bestzeit!':'Deine Auswertung';
- $('finishText').textContent=correct===roundCount()?'Alle '+roundCount()+' Aufgaben richtig beantwortet.':'Alle '+roundCount()+' Aufgaben beantwortet.';
+ $('finishText').textContent=timedOut?'Die 20 Minuten sind vorbei. '+unanswered+' Aufgaben blieben offen.':correct===roundCount()?'Alle '+roundCount()+' Aufgaben richtig beantwortet.':'Alle '+roundCount()+' Aufgaben beantwortet.';
  $('summary').textContent=time(ms);$('summary').classList.toggle('over',ms>timeLimit());
- $('rightCount').textContent=correct;$('wrongCount').textContent=errors;$('accuracy').textContent=(correct/roundCount()*100)+' %';
- $('reviewSummary').textContent=errors===0?'Alle Antworten sind richtig.':errors+' '+(errors===1?'Aufgabe kannst':'Aufgaben kannst')+' du noch üben.';
- $('detailScore').hidden=!isSequence();if(isSequence()){const all=responses.flatMap(r=>r.answers.map((v,i)=>v===r.expected[i]));$('detailScore').textContent=all.filter(Boolean).length+' von '+all.length+' einzelnen Zahlen richtig. Eine Reihe ist richtig, wenn alle Lücken stimmen.';}
+ $('examResult').hidden=mode!==EXAM;
+ $('examResult').textContent=mode===EXAM?correct+' / 30 Punkte · Note '+gradeFor(correct):'';
+ $('rightCount').textContent=correct;$('wrongCount').textContent=errors;$('accuracy').textContent=Math.round(correct/roundCount()*100)+' %';
+ $('reviewSummary').textContent=unanswered?'Offene Aufgaben geben 0 Punkte.':errors===0?'Alle Antworten sind richtig.':errors+' '+(errors===1?'Aufgabe kannst':'Aufgaben kannst')+' du noch üben.';
+ $('detailScore').hidden=mode!=='zahlenreihen-v1';if(mode==='zahlenreihen-v1'){const all=responses.flatMap(r=>r.answers.map((v,i)=>v===r.expected[i]));$('detailScore').textContent=all.filter(Boolean).length+' von '+all.length+' einzelnen Zahlen richtig. Eine Reihe ist richtig, wenn alle Lücken stimmen.';}
+ $('recordText').hidden=mode===EXAM;
  $('recordText').textContent=eligible?'Deine Zeit steht jetzt in der Bestenliste.':errors>0?'Für die Bestenliste: unter '+limitMinutes()+' Minuten und alle '+roundCount()+' richtig.':'Dein Ziel: weniger als '+limitMinutes()+' Minuten.';
- const result={ms,errors,correct,date:Date.now(),mode,total:roundCount(),responses:responses.map(r=>({...r}))};
+ const result={ms,errors,correct,date:Date.now(),mode,total:roundCount(),...(mode===EXAM?{grade:gradeFor(correct),unanswered}:{}),responses:responses.map(r=>({...r}))};
  history.unshift(result);$('viewResults').onclick=()=>openReview(result);history=history.slice(0,500);
  try{localStorage.setItem(KEY,JSON.stringify(history))}catch{storageOK=false;$('storageNotice').hidden=false;}
  renderRecords();$('again').focus({preventScroll:true});
@@ -165,13 +202,17 @@ function submitAnswer(response){
  else showQuestion();
 }
 function submitPlace(){
- if(!running||tasks[index].kind!=='build')return;
+ if(!running||expireExam()||tasks[index].kind!=='build')return;
  const task=tasks[index];
  const answer=marked[0]*100+marked[1]*10+marked[2];
  submitAnswer({title:task.title,answer,expected:task.expected,correct:answer===task.expected});
 }
+function reviewTaskTitle(task){
+ if(task.kind==='read')return task.title+' '+task.digits.map((count,i)=>count+' '+placeNames[i]).join(', ');
+ return task.instruction??task.title;
+}
 function key(k){
- if(!running||tasks[index].kind==='build')return;
+ if(!running||expireExam()||tasks[index].kind==='build')return;
  if(/^\d$/.test(k)){
   if(value.length<(mode===MODE?3:4))value+=k;
   if(isSequence()){entries[activeBlank]=value;drawSequence();}else $('answer').textContent=value||'?';
@@ -184,12 +225,12 @@ function key(k){
    const task=tasks[index],answers=entries.map(Number),expected=task.blanks.map(i=>task.numbers[i]);
    const correct=answers.every((v,i)=>v===expected[i]);
    submitAnswer({kind:task.kind,title:task.title,numbers:[...task.numbers],blanks:[...task.blanks],answers,expected,correct});
-  }else if(mode===MODE){
+  }else if(Array.isArray(tasks[index])){
    const [a,b]=tasks[index],answer=Number(value),correct=answer===a*b;
    submitAnswer({a,b,answer,correct});
   }else{
    const task=tasks[index],answer=Number(value),expected=task.expected;
-   const title=task.kind==='read'?task.title+' '+task.digits.map((count,i)=>count+' '+placeNames[i]).join(', '):task.title;
+   const title=reviewTaskTitle(task);
    submitAnswer({title,answer,expected,correct:answer===expected});
   }
  }
@@ -199,6 +240,7 @@ function openReview(round){
  $('reviewTitle').textContent='Deine Auswertung';
  $('reviewMode').textContent=(MODES[round.mode]??MODES[MODE]).name;
  $('reviewStats').textContent=Number.isInteger(round.correct)?`${round.correct} richtig · ${round.errors} falsch · ${time(round.ms)}`:`Zeit ${time(round.ms)} · ${round.errors} Fehlversuche`;
+ if(round.grade)$('reviewStats').textContent+= ' · '+round.correct+' / 30 Punkte · Note '+round.grade+(round.unanswered?' · '+round.unanswered+' offen':'');
  const hasDetails=Array.isArray(round.responses)&&round.responses.length===savedCount(round);
  $('allAnswers').textContent='Alle '+savedCount(round)+' Antworten';
  $('reviewFilters').hidden=!hasDetails;
@@ -213,10 +255,11 @@ function renderReview(){
  const visible=reviewFilter==='wrong'?details.filter(r=>!r.correct):details;
  $('reviewRows').replaceChildren();
  $('reviewTable').hidden=visible.length===0;
- $('reviewEmpty').hidden=details.length!==savedCount(reviewRound)||visible.length>0;
+ $('reviewEmpty').hidden=!reviewRound||details.length!==savedCount(reviewRound)||visible.length>0;
  for(const r of visible){
   const row=document.createElement('tr');
   const columns=r.numbers?[r.numbers.map((v,i)=>r.blanks.includes(i)?'?':v).join(' · '),r.answers.join(', ')+(r.correct?' ✓':' ✕'),r.expected.join(', ')]:[r.title??(r.a+' × '+r.b),String(r.answer)+(r.correct?' ✓':' ✕'),String(r.expected??(r.a*r.b))];
+  if(r.unanswered)columns[1]='Offen';
   for(const text of columns){const cell=document.createElement('td');cell.textContent=text;row.append(cell)}
   row.className=r.correct?'answer-correct':'answer-wrong';$('reviewRows').append(row);
  }
@@ -236,6 +279,7 @@ function renderRecords(){
   const right=document.createElement('span'),t=document.createElement('span'),meta=document.createElement('span');
   t.className='record-time'+(r.ms>timeLimit()?' over':'');t.textContent=time(r.ms);meta.className='record-meta';
   meta.textContent=Number.isInteger(r.correct)?r.correct+'/'+savedCount(r)+' richtig':r.errors===0?'fehlerfrei':r.errors+' Fehlv.';
+  if(r.grade)meta.textContent=r.correct+'/30 Punkte · Note '+r.grade;
   const hint=document.createElement('span');hint.className='record-hint';hint.textContent=r.mode===mode?'Auswertung ansehen ›':'Frühere Runde ›';
   right.append(t,meta,hint);row.append(left,right);row.onclick=()=>openReview(r);$('records').append(row);
  });
@@ -258,4 +302,5 @@ $('multiplyMode').onclick=()=>setMode(MODE);$('sequenceMode').onclick=()=>setMod
 $('bookMode').onclick=()=>setMode('tausenderbuch-v1');
 $('placeMode').onclick=()=>setMode('stellenwert-v1');
 $('submitPlace').onclick=submitPlace;
+$('examMode').onclick=()=>setMode(EXAM);
 setMode(MODE);

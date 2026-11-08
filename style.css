@@ -31,3 +31,9 @@
 .place-shape[aria-pressed="false"]::after {opacity:.22}
 .place-clear {font:inherit;font-size:.8rem;border:1px solid #809487;background:white;color:#213a2d;border-radius:5px;min-height:26px;min-width:35px;margin-bottom:4px}
 #submitPlace {margin:12px auto 0}
+
+.book-route {display:flex;justify-content:center;gap:8px;margin:0 auto 8px}
+.book-route span {padding:4px 10px;border-radius:8px;background:#e6f1e8;color:#174f3c;font-size:1.2rem;font-weight:800}
+#examScale {padding:8px;text-align:center;font-size:.85rem}
+#examScale p {line-height:1.7}
+#examResult {font-size:1.4rem;font-weight:800;color:#174f3c}

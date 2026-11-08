@@ -44,26 +44,33 @@ const FlinkTasks = (() => {
   {name:'unten', arrow:'↓', row:1, column:0}
  ];
  function bookTasks() {
-  const tasks = [];
-  const pool = Array.from({length:100}, (_,i)=>i);
-  for (let i=0;i<10;i++) {
-   const direction = directions[i%directions.length];
-   const jumps = 1+i%3;
+  // Each pair is a direction index and the number of fields in that direction.
+  const routes = [
+   [[0,2]], [[1,3]], [[2,2]], [[3,1]],
+   [[3,2],[0,3]], [[1,2],[2,1]], [[0,1],[3,3]],
+   [[3,2],[0,3],[2,1]], [[2,2],[1,2],[3,1]], [[0,2],[3,1],[1,1]]
+  ];
+  return shuffle(routes.map((route,i)=>{
    const first = 1+100*Math.floor(Math.random()*10);
-   const eligible = pool.filter(cell=>{
-    const row = Math.floor(cell/10)+direction.row*jumps;
-    const column = cell%10+direction.column*jumps;
-    return row>=0&&row<10&&column>=0&&column<10;
+   const moves = route.map(([index,count])=>({...directions[index],count}));
+   const eligible = Array.from({length:100},(_,cell)=>cell).filter(cell=>{
+    let row=Math.floor(cell/10),column=cell%10;
+    return moves.every(move=>{
+     row+=move.row*move.count;
+     column+=move.column*move.count;
+     return row>=0&&row<10&&column>=0&&column<10;
+    });
    });
    const start = first+eligible[Math.floor(Math.random()*eligible.length)];
-   const end = start+jumps*(10*direction.row+direction.column);
-   const inverse = i>=5;
+   const end = start+moves.reduce((sum,move)=>sum+move.count*(10*move.row+move.column),0);
+   const inverse = i===1||i===3;
+   const move = moves[0];
    const title = inverse
-    ? `Wie viele Felder springst du von ${start} nach ${end} ${direction.name} ${direction.arrow}?`
-    : `Starte bei ${start}. Springe ${jumps} ${jumps===1?'Feld':'Felder'} nach ${direction.name} ${direction.arrow}. Wo landest du?`;
-   tasks.push({kind:'book',title,first,start,end,inverse,expected:inverse?jumps:end});
-  }
-  return shuffle(tasks);
+    ? `Wie viele Felder springst du von ${start} nach ${end} ${move.name} ${move.arrow}?`
+    : `Starte bei ${start}. Folge den Pfeilen. Wo landest du?`;
+   const instruction = inverse ? title : title+' '+moves.map(move=>move.count+' '+move.name+' '+move.arrow).join(', dann ');
+   return {kind:'book',title,instruction,moves,first,start,end,inverse,expected:inverse?move.count:end};
+  }));
  }
  function placeTasks() {
   const easy = [102,105,120,126,203,210,230,245,302,306,320,326,340,405,420,432,501,510,543,650,702,810,900,904];
@@ -74,6 +81,17 @@ const FlinkTasks = (() => {
   }));
  }
  function make(mode) {
+  if (mode === 'klassentest-v1') {
+   const book=bookTasks();
+   const bookSelection=[...book.filter(task=>task.moves.length===1).slice(0,2),
+    ...book.filter(task=>task.moves.length===2).slice(0,2),book.find(task=>task.moves.length===3)];
+   return [
+    ...make('2bis9-v1').slice(0,10),
+    ...make('zahlenreihen-v1').slice(0,5),
+    ...placeTasks(),
+    ...shuffle(bookSelection)
+   ];
+  }
   if (mode === 'tausenderbuch-v1') return bookTasks();
   if (mode === 'stellenwert-v1') return placeTasks();
   if (mode === '2bis9-v1') {
