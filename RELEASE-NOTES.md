@@ -1,10 +1,3 @@
-Flink 1.4 ergänzt Zahlenreihen bis 1000.
+Flink 1.5 passt die Zahlenreihen bis 1000 an das Grundschulniveau der Arbeitsblätter an. Die Mitte wird zwischen glatten Eckzahlen gesucht. Die Zählaufgaben üben vor allem Schritte von 50 und 100, die übrigen Reihen folgen den Mustern der Arbeitsblätter.
 
-* Neue Auswahl zwischen Einmaleins und Zahlenreihen.
-* Vorwärts und rückwärts zählen, Reihen fortsetzen, Schrittweiten finden und die Mitte bestimmen.
-* Immer 20 Aufgaben. Bei Zahlenreihen zählt eine vollständige Reihe als eine Aufgabe.
-* Falsche Antworten führen weiter. Die Auswertung zeigt falsche Reihen, richtige Lösungen und die Anzahl richtig ausgefüllter Zahlen.
-* Bestzeiten und letzte Runden werden je Übung angezeigt. Vorhandene Ergebnisse bleiben erhalten.
-* Musik, Applaus und sämtliche Rechenergebnisse bleiben auf dem Gerät.
-
-Android: Die dauerhaft signierte Version kann über Flink 1.3 installiert werden. Der Signaturschlüssel bleibt unverändert. Die APK benötigt keine Berechtigungen und funktioniert vollständig offline.
+Für 20 Zahlenreihen gilt eine Zeitgrenze von zehn Minuten. Beim Einmaleins gelten weiterhin zwei Minuten. Das Update kann über Flink 1.4 installiert werden.
