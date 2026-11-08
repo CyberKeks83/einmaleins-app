@@ -1,26 +1,39 @@
 'use strict';
-const $=id=>document.getElementById(id),COUNT=20,MODE='2bis9-v1',KEY='flink-results-v1';
+const $=id=>document.getElementById(id),MODE='2bis9-v1',KEY='flink-results-v1';
 let history=[],storageOK=true;try{history=JSON.parse(localStorage.getItem(KEY)||'[]');if(!Array.isArray(history))history=[];history=history.filter(r=>Number.isFinite(r.ms)&&r.ms>=0&&Number.isInteger(r.errors)&&r.errors>=0&&Number.isFinite(r.date));localStorage.setItem(KEY,JSON.stringify(history));}catch{history=[];storageOK=false;$('storageNotice').hidden=false;}
-let mode=MODE,entries=[],activeBlank=0;
+let mode=MODE,entries=[],activeBlank=0,marked=[0,0,0];
+const MODES = {
+ '2bis9-v1': {name:'Kleines Einmaleins', count:20, minutes:2, art:'7 × 8 = ?', intro:'Gemischte Aufgaben aus den Reihen 2 bis 9.'},
+ 'zahlenreihen-v1': {name:'Zahlenreihen bis 1000', count:10, minutes:10, art:'398 · 399 · ?', intro:'Zähle vorwärts und rückwärts, ergänze Reihen und finde die Mitte.'},
+ 'tausenderbuch-v1': {name:'Tausenderbuch', count:10, minutes:10, art:'← ↑ ↓ →', intro:'Springe auf einer Hundertertafel. Ein Feld nach rechts bedeutet +1, ein Feld nach unten +10.'},
+ 'stellenwert-v1': {name:'Hunderter, Zehner, Einer', count:10, minutes:10, art:'H · Z · E', intro:'Lies und baue Zahlen aus roten Hundertern, blauen Zehnern und grünen Einern.'}
+};
+
 let responses=[],tasks=[],index=0,errors=0,value='',startTime=0,ticker=null,running=false,tab='best',reviewRound=null,reviewFilter='wrong';
 const sound=typeof FlinkAudio!=='undefined'?FlinkAudio:{attach(){},startRound(){},finishRound(){},stop(){}};
 sound.attach();
 const time=ms=>{const s=Math.floor(ms/1000);return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')};
 function paintTime(ms){$('time').textContent=time(ms);$('timer').classList.toggle('over',ms>timeLimit());$('timer').setAttribute('aria-label','Vergangene Zeit '+time(ms)+(ms>timeLimit()?', über '+limitMinutes()+' Minuten':''));}
-function paintDots(){const nodes=Array.from({length:COUNT},(_,i)=>{const el=document.createElement('span');el.className='dot'+(i<index?' done':i===index&&running?' current':'');return el});$('dots').replaceChildren(...nodes);}
+function paintDots(){const nodes=Array.from({length:roundCount()},(_,i)=>{const el=document.createElement('span');el.className='dot'+(i<index?' done':i===index&&running?' current':'');return el});$('dots').replaceChildren(...nodes);}
 function isSequence(){return mode==='zahlenreihen-v1';}
-function limitMinutes(){return isSequence()?10:2;}
+function limitMinutes(){return MODES[mode].minutes;}
+function roundCount(){return MODES[mode].count;}
+function savedCount(round){return round.total ?? 20;}
 function timeLimit(){return limitMinutes()*60_000;}
 function setMode(next){
  if(running)return;
- mode=next;$('multiplyMode').setAttribute('aria-pressed',String(!isSequence()));$('sequenceMode').setAttribute('aria-pressed',String(isSequence()));
- $('welcomeTitle').textContent=isSequence()?'Entdecke die nächste Zahl!':'Auf die Plätze, fertig, rechnen!';
- $('welcomeText').textContent=isSequence()?'20 Zahlenreihen bis 1000. Vorwärts, rückwärts, Schrittweiten und die Mitte. Jede Reihe zählt als eine Aufgabe.':'20 gemischte Aufgaben aus den Reihen 2 bis 9. Jede Antwort zählt. Deine Auswertung kommt am Ende.';
- $('mathArt').textContent=isSequence()?'398 · 399 · ?':'7 × 8 = ?';
+ mode=next;
+ for(const [id,key] of Object.entries({multiplyMode:MODE,sequenceMode:'zahlenreihen-v1',bookMode:'tausenderbuch-v1',placeMode:'stellenwert-v1'})){
+  $(id).setAttribute('aria-pressed',String(mode===key));
+ }
+ const exercise=MODES[mode];
+ $('welcomeTitle').textContent=exercise.name;
+ $('welcomeText').textContent=exercise.count+' Aufgaben. '+exercise.intro;
+ $('mathArt').textContent=exercise.art;
  $('finished').hidden=true;$('welcome').hidden=false;$('progressLabel').textContent='Bereit, wenn du es bist.';index=0;paintDots();paintTime(0);
  $('goalTime').textContent='Bis '+limitMinutes()+':00 grün';
  $('bestTimeLimit').textContent='unter '+limitMinutes()+' Min.';
- $('recordNote').textContent='Tippe auf eine Runde für die Auswertung. Für die Bestenliste brauchst du 20 richtige Aufgaben in weniger als '+limitMinutes()+' Minuten.';
+ $('recordNote').textContent='Tippe auf eine Runde für die Auswertung. Für die Bestenliste brauchst du '+roundCount()+' richtige Aufgaben in weniger als '+limitMinutes()+' Minuten.';
  renderRecords();
 }
 function drawSequence(){
@@ -35,41 +48,131 @@ function drawSequence(){
  });
  $('feedback').textContent='Zahl '+(activeBlank+1)+' von '+task.blanks.length+' · Mit ✓ weiter.';
 }
+function drawBook(task){
+ const grid=$('bookGrid');
+ grid.replaceChildren();
+ for(let n=task.first;n<task.first+100;n++){
+  const cell=document.createElement('span');
+  cell.textContent=n;
+  if(n===task.start)cell.className='book-start';
+  if(task.inverse&&n===task.end)cell.className='book-end';
+  grid.append(cell);
+ }
+ $('bookHint').textContent='↑ −10 · ← −1 · → +1 · ↓ +10'+(task.inverse?' · Ziel gelb':'')+' · Start grün';
+}
+const placeNames=['Hunderter','Zehner','Einer'];
+function drawPlaces(task, update=false){
+ const panel=$('placeGroups');
+ const building=task.kind==='build';
+ if(!update){
+  panel.replaceChildren();
+  for(let column=0;column<3;column++){
+   const group=document.createElement('section');
+   group.className='place-group place-'+column;
+   const label=document.createElement('strong');
+   label.textContent=placeNames[column];
+   group.append(label);
+   const shapes=document.createElement('div');
+   shapes.className='place-shapes';
+   const count=building?9:task.digits[column];
+   for(let i=0;i<count;i++){
+    const shape=document.createElement(building?'button':'span');
+    shape.className='place-shape';
+    if(building){
+     shape.type='button';
+     shape.setAttribute('aria-label',(i+1)+' '+placeNames[column]);
+     shape.onclick=()=>{
+      marked[column]=marked[column]===i+1?i:i+1;
+      drawPlaces(task,true);
+     };
+    }else shape.setAttribute('aria-hidden','true');
+    shapes.append(shape);
+   }
+   if(building){
+    const clear=document.createElement('button');
+    clear.type='button';
+    clear.className='place-clear';
+    clear.textContent='0';
+    clear.setAttribute('aria-label',placeNames[column]+' auf null setzen');
+    clear.onclick=()=>{marked[column]=0;drawPlaces(task,true);};
+    group.append(clear);
+   }
+   group.append(shapes);
+   panel.append(group);
+  }
+ }
+ if(building){
+  Array.from(panel.children).forEach((group,column)=>{
+   Array.from(group.lastElementChild.children).forEach((shape,i)=>{
+    shape.setAttribute('aria-pressed',String(i<marked[column]));
+   });
+  });
+  $('placeHint').textContent=marked.map((count,i)=>count+' '+placeNames[i]).join(' · ');
+ }else{
+  $('placeHint').textContent='';
+ }
+}
 function showQuestion(){
  value='';entries=[];activeBlank=0;$('answer').textContent='?';$('feedback').textContent='Tippe dein Ergebnis ein.';$('feedback').classList.remove('error');
- $('sequenceCells').hidden=!isSequence();$('answer').hidden=isSequence();$('question').classList.toggle('sequence-title',isSequence());
+ const task=tasks[index];
+ const isBook=task.kind==='book';
+ const isPlace=task.kind==='build'||task.kind==='read';
+ const building=task.kind==='build';
+ $('sequenceCells').hidden=!isSequence();
+ $('answer').hidden=isSequence()||building;
+ $('question').classList.toggle('sequence-title',mode!==MODE);
+ $('bookPanel').hidden=!isBook;
+ $('placePanel').hidden=!isPlace;
+ $('keypad').hidden=building;
+ $('feedback').hidden=building;
+ $('submitPlace').hidden=!building;
+ if(isBook)drawBook(task);
+ if(isPlace){marked=[0,0,0];drawPlaces(task);}
  if(isSequence()){entries=tasks[index].blanks.map(()=> '');$('question').textContent=tasks[index].title;drawSequence();}
- else $('question').textContent=tasks[index][0]+' × '+tasks[index][1]+' =';
- $('progressLabel').textContent='Aufgabe '+(index+1)+' von 20';paintDots();
+ else $('question').textContent=task.title??(task[0]+' × '+task[1]+' =');
+ $('progressLabel').textContent='Aufgabe '+(index+1)+' von '+roundCount();paintDots();
 }
 function start(){
  sound.startRound();tasks=FlinkTasks.make(mode);index=0;errors=0;responses=[];running=true;startTime=performance.now();
  $('modePicker').hidden=true;$('welcome').hidden=true;$('finished').hidden=true;$('playing').hidden=false;
  paintTime(0);showQuestion();clearInterval(ticker);ticker=setInterval(()=>paintTime(performance.now()-startTime),80);
- if(!isSequence())$('answer').focus({preventScroll:true});
+ if(!$('answer').hidden)$('answer').focus({preventScroll:true});
 }
 function finish(){
- const ms=performance.now()-startTime,correct=COUNT-errors;
+ const ms=performance.now()-startTime,correct=roundCount()-errors;
  running=false;sound.finishRound();clearInterval(ticker);paintTime(ms);paintDots();
- $('playing').hidden=true;$('finished').hidden=false;$('modePicker').hidden=false;$('progressLabel').textContent='20 von 20 beantwortet';
+ $('playing').hidden=true;$('finished').hidden=false;$('modePicker').hidden=false;$('progressLabel').textContent=roundCount()+' von '+roundCount()+' beantwortet';
  const eligible=ms<timeLimit()&&errors===0;
- const oldBest=history.filter(r=>r.mode===mode&&r.errors===0&&r.ms<timeLimit()).reduce((a,r)=>Math.min(a,r.ms),Infinity);
+ const oldBest=history.filter(r=>r.mode===mode&&savedCount(r)===roundCount()&&r.errors===0&&r.ms<timeLimit()).reduce((a,r)=>Math.min(a,r.ms),Infinity);
  $('finishTitle').textContent=eligible&&ms<oldBest?'Neue persönliche Bestzeit!':'Deine Auswertung';
- $('finishText').textContent=correct===COUNT?'Alle 20 Aufgaben richtig beantwortet.':'Alle 20 Aufgaben beantwortet. Hier ist dein Ergebnis.';
+ $('finishText').textContent=correct===roundCount()?'Alle '+roundCount()+' Aufgaben richtig beantwortet.':'Alle '+roundCount()+' Aufgaben beantwortet.';
  $('summary').textContent=time(ms);$('summary').classList.toggle('over',ms>timeLimit());
- $('rightCount').textContent=correct;$('wrongCount').textContent=errors;$('accuracy').textContent=(correct/COUNT*100)+' %';
+ $('rightCount').textContent=correct;$('wrongCount').textContent=errors;$('accuracy').textContent=(correct/roundCount()*100)+' %';
  $('reviewSummary').textContent=errors===0?'Alle Antworten sind richtig.':errors+' '+(errors===1?'Aufgabe kannst':'Aufgaben kannst')+' du noch üben.';
  $('detailScore').hidden=!isSequence();if(isSequence()){const all=responses.flatMap(r=>r.answers.map((v,i)=>v===r.expected[i]));$('detailScore').textContent=all.filter(Boolean).length+' von '+all.length+' einzelnen Zahlen richtig. Eine Reihe ist richtig, wenn alle Lücken stimmen.';}
- $('recordText').textContent=eligible?'Deine Zeit steht jetzt in der Bestenliste.':errors>0?'Für die Bestenliste: unter '+limitMinutes()+' Minuten und alle 20 richtig.':'Dein Ziel: weniger als '+limitMinutes()+' Minuten.';
- const result={ms,errors,correct,date:Date.now(),mode,responses:responses.map(r=>({...r}))};
+ $('recordText').textContent=eligible?'Deine Zeit steht jetzt in der Bestenliste.':errors>0?'Für die Bestenliste: unter '+limitMinutes()+' Minuten und alle '+roundCount()+' richtig.':'Dein Ziel: weniger als '+limitMinutes()+' Minuten.';
+ const result={ms,errors,correct,date:Date.now(),mode,total:roundCount(),responses:responses.map(r=>({...r}))};
  history.unshift(result);$('viewResults').onclick=()=>openReview(result);history=history.slice(0,500);
  try{localStorage.setItem(KEY,JSON.stringify(history))}catch{storageOK=false;$('storageNotice').hidden=false;}
  renderRecords();$('again').focus({preventScroll:true});
 }
+function submitAnswer(response){
+ responses.push(response);
+ if(!response.correct)errors++;
+ index++;
+ if(index===roundCount())finish();
+ else showQuestion();
+}
+function submitPlace(){
+ if(!running||tasks[index].kind!=='build')return;
+ const task=tasks[index];
+ const answer=marked[0]*100+marked[1]*10+marked[2];
+ submitAnswer({title:task.title,answer,expected:task.expected,correct:answer===task.expected});
+}
 function key(k){
- if(!running)return;
+ if(!running||tasks[index].kind==='build')return;
  if(/^\d$/.test(k)){
-  if(value.length<(isSequence()?4:3))value+=k;
+  if(value.length<(mode===MODE?3:4))value+=k;
   if(isSequence()){entries[activeBlank]=value;drawSequence();}else $('answer').textContent=value||'?';
  }else if(k==='Backspace'){
   value=value.slice(0,-1);if(isSequence()){entries[activeBlank]=value;drawSequence();}else $('answer').textContent=value||'?';
@@ -79,20 +182,24 @@ function key(k){
    if(missing>=0){activeBlank=missing;value=entries[missing];drawSequence();return;}
    const task=tasks[index],answers=entries.map(Number),expected=task.blanks.map(i=>task.numbers[i]);
    const correct=answers.every((v,i)=>v===expected[i]);
-   responses.push({kind:task.kind,title:task.title,numbers:[...task.numbers],blanks:[...task.blanks],answers,expected,correct});if(!correct)errors++;
-  }else{
+   submitAnswer({kind:task.kind,title:task.title,numbers:[...task.numbers],blanks:[...task.blanks],answers,expected,correct});
+  }else if(mode===MODE){
    const [a,b]=tasks[index],answer=Number(value),correct=answer===a*b;
-   responses.push({a,b,answer,correct});if(!correct)errors++;
+   submitAnswer({a,b,answer,correct});
+  }else{
+   const task=tasks[index],answer=Number(value),expected=task.expected;
+   const title=task.kind==='read'?task.title+' '+task.digits.map((count,i)=>count+' '+placeNames[i]).join(', '):task.title;
+   submitAnswer({title,answer,expected,correct:answer===expected});
   }
-  index++;if(index===COUNT)finish();else showQuestion();
  }
 }
 function openReview(round){
  reviewRound=round;reviewFilter='wrong';
  $('reviewTitle').textContent='Deine Auswertung';
- $('reviewMode').textContent=round.mode==='zahlenreihen-v1'?'Zahlenreihen bis 1000':'Kleines Einmaleins';
+ $('reviewMode').textContent=(MODES[round.mode]??MODES[MODE]).name;
  $('reviewStats').textContent=Number.isInteger(round.correct)?`${round.correct} richtig · ${round.errors} falsch · ${time(round.ms)}`:`Zeit ${time(round.ms)} · ${round.errors} Fehlversuche`;
- const hasDetails=Array.isArray(round.responses)&&round.responses.length===COUNT;
+ const hasDetails=Array.isArray(round.responses)&&round.responses.length===savedCount(round);
+ $('allAnswers').textContent='Alle '+savedCount(round)+' Antworten';
  $('reviewFilters').hidden=!hasDetails;
  $('reviewLegacy').hidden=hasDetails;
  $('reviewLegacy').textContent='Für diese frühere Runde wurden noch keine einzelnen Antworten gespeichert. Neue Runden kannst du hier vollständig ansehen.';
@@ -105,19 +212,19 @@ function renderReview(){
  const visible=reviewFilter==='wrong'?details.filter(r=>!r.correct):details;
  $('reviewRows').replaceChildren();
  $('reviewTable').hidden=visible.length===0;
- $('reviewEmpty').hidden=details.length!==COUNT||visible.length>0;
+ $('reviewEmpty').hidden=details.length!==savedCount(reviewRound)||visible.length>0;
  for(const r of visible){
   const row=document.createElement('tr');
-  const columns=r.numbers?[r.numbers.map((v,i)=>r.blanks.includes(i)?'?':v).join(' · '),r.answers.join(', ')+(r.correct?' ✓':' ✕'),r.expected.join(', ')]:[r.a+' × '+r.b,String(r.answer)+(r.correct?' ✓':' ✕'),String(r.a*r.b)];
+  const columns=r.numbers?[r.numbers.map((v,i)=>r.blanks.includes(i)?'?':v).join(' · '),r.answers.join(', ')+(r.correct?' ✓':' ✕'),r.expected.join(', ')]:[r.title??(r.a+' × '+r.b),String(r.answer)+(r.correct?' ✓':' ✕'),String(r.expected??(r.a*r.b))];
   for(const text of columns){const cell=document.createElement('td');cell.textContent=text;row.append(cell)}
   row.className=r.correct?'answer-correct':'answer-wrong';$('reviewRows').append(row);
  }
 }
 function renderRecords(){
- const rows=tab==='best'?history.filter(r=>r.mode===mode&&r.ms<timeLimit()&&r.errors===0).sort((a,b)=>a.ms-b.ms).slice(0,5):history.filter(r=>r.mode===mode||(!r.mode&&mode===MODE)).slice(0,5);
+ const rows=tab==='best'?history.filter(r=>r.mode===mode&&savedCount(r)===roundCount()&&r.ms<timeLimit()&&r.errors===0).sort((a,b)=>a.ms-b.ms).slice(0,5):history.filter(r=>r.mode===mode||(!r.mode&&mode===MODE)).slice(0,5);
  $('bestTab').setAttribute('aria-selected',String(tab==='best'));$('recentTab').setAttribute('aria-selected',String(tab==='recent'));
  $('records').setAttribute('aria-labelledby',tab==='best'?'bestTab':'recentTab');$('records').replaceChildren();
- if(!rows.length){const e=document.createElement('div');e.className='empty';e.textContent=tab==='best'?'Hier ist Platz für deine ersten Bestzeiten. 20 Aufgaben der gewählten Übung, ohne Fehler, unter '+limitMinutes()+' Minuten.':'Deine letzten fünf abgeschlossenen Runden erscheinen hier.';$('records').append(e);return;}
+ if(!rows.length){const e=document.createElement('div');e.className='empty';e.textContent=tab==='best'?'Hier ist Platz für deine ersten Bestzeiten. '+roundCount()+' Aufgaben der gewählten Übung, ohne Fehler, unter '+limitMinutes()+' Minuten.':'Deine letzten fünf abgeschlossenen Runden erscheinen hier.';$('records').append(e);return;}
  rows.forEach((r,i)=>{
   const row=document.createElement('button');row.type='button';row.className='record';
   row.setAttribute('aria-label','Auswertung ansehen: '+new Date(r.date).toLocaleString('de-DE'));
@@ -127,7 +234,7 @@ function renderRecords(){
   left.append(rank,date);
   const right=document.createElement('span'),t=document.createElement('span'),meta=document.createElement('span');
   t.className='record-time'+(r.ms>timeLimit()?' over':'');t.textContent=time(r.ms);meta.className='record-meta';
-  meta.textContent=Number.isInteger(r.correct)?r.correct+'/20 richtig':r.errors===0?'fehlerfrei':r.errors+' Fehlv.';
+  meta.textContent=Number.isInteger(r.correct)?r.correct+'/'+savedCount(r)+' richtig':r.errors===0?'fehlerfrei':r.errors+' Fehlv.';
   const hint=document.createElement('span');hint.className='record-hint';hint.textContent=r.mode===mode?'Auswertung ansehen ›':'Frühere Runde ›';
   right.append(t,meta,hint);row.append(left,right);row.onclick=()=>openReview(r);$('records').append(row);
  });
@@ -146,4 +253,8 @@ $('eraseResults').onclick=()=>{
 };
 
 
-$('multiplyMode').onclick=()=>setMode(MODE);$('sequenceMode').onclick=()=>setMode('zahlenreihen-v1');setMode(MODE);
+$('multiplyMode').onclick=()=>setMode(MODE);$('sequenceMode').onclick=()=>setMode('zahlenreihen-v1');
+$('bookMode').onclick=()=>setMode('tausenderbuch-v1');
+$('placeMode').onclick=()=>setMode('stellenwert-v1');
+$('submitPlace').onclick=submitPlace;
+setMode(MODE);

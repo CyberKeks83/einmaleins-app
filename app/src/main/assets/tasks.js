@@ -37,7 +37,45 @@ const FlinkTasks = (() => {
   [0,200], [200,400], [600,800], [800,1000],
   [0,500], [500,1000], [0,1000]
  ];
+ const directions = [
+  {name:'rechts', arrow:'→', row:0, column:1},
+  {name:'links', arrow:'←', row:0, column:-1},
+  {name:'oben', arrow:'↑', row:-1, column:0},
+  {name:'unten', arrow:'↓', row:1, column:0}
+ ];
+ function bookTasks() {
+  const tasks = [];
+  const pool = Array.from({length:100}, (_,i)=>i);
+  for (let i=0;i<10;i++) {
+   const direction = directions[i%directions.length];
+   const jumps = 1+i%3;
+   const first = 1+100*Math.floor(Math.random()*10);
+   const eligible = pool.filter(cell=>{
+    const row = Math.floor(cell/10)+direction.row*jumps;
+    const column = cell%10+direction.column*jumps;
+    return row>=0&&row<10&&column>=0&&column<10;
+   });
+   const start = first+eligible[Math.floor(Math.random()*eligible.length)];
+   const end = start+jumps*(10*direction.row+direction.column);
+   const inverse = i>=5;
+   const title = inverse
+    ? `Wie viele Felder springst du von ${start} nach ${end} ${direction.name} ${direction.arrow}?`
+    : `Starte bei ${start}. Springe ${jumps} ${jumps===1?'Feld':'Felder'} nach ${direction.name} ${direction.arrow}. Wo landest du?`;
+   tasks.push({kind:'book',title,first,start,end,inverse,expected:inverse?jumps:end});
+  }
+  return shuffle(tasks);
+ }
+ function placeTasks() {
+  const easy = [102,105,120,126,203,210,230,245,302,306,320,326,340,405,420,432,501,510,543,650,702,810,900,904];
+  return shuffle(easy).slice(0,10).map((expected,i)=>({
+   kind:i<5?'build':'read',expected,
+   digits:[Math.floor(expected/100),Math.floor(expected/10)%10,expected%10],
+   title:i<5?`Stelle die Zahl ${expected} dar.`:'Welche Zahl siehst du?'
+  }));
+ }
  function make(mode) {
+  if (mode === 'tausenderbuch-v1') return bookTasks();
+  if (mode === 'stellenwert-v1') return placeTasks();
   if (mode === '2bis9-v1') {
    const pool = [];
    for (let a = 2; a <= 9; a++) for (let b = 2; b <= 9; b++) pool.push([a,b]);
@@ -46,13 +84,13 @@ const FlinkTasks = (() => {
   const take = (pool, count, kind) => shuffle([...pool]).slice(0,count)
    .map(([start,step]) => sequence(kind,start,step));
   return shuffle([
-   ...take(givenSteps.filter(([,step]) => step === 100), 2, 'step'),
-   ...take(givenSteps.filter(([,step]) => step === 50), 2, 'step'),
-   ...take(givenSteps.filter(([,step]) => step === -50), 2, 'step'),
-   ...take(continuations.filter(([,step]) => step > 0), 3, 'continue'),
-   ...take(continuations.filter(([,step]) => step < 0), 3, 'continue'),
-   ...take(hiddenSteps, 4, 'find'),
-   ...shuffle([...midpoints]).slice(0,4).map(([left,right]) => ({
+   ...take(givenSteps.filter(([,step]) => step === 100), 1, 'step'),
+   ...take(givenSteps.filter(([,step]) => step === 50), 1, 'step'),
+   ...take(givenSteps.filter(([,step]) => step === -50), 1, 'step'),
+   ...take(continuations.filter(([,step]) => step > 0), 2, 'continue'),
+   ...take(continuations.filter(([,step]) => step < 0), 1, 'continue'),
+   ...take(hiddenSteps, 2, 'find'),
+   ...shuffle([...midpoints]).slice(0,2).map(([left,right]) => ({
     kind: 'middle',
     title: 'Welche Zahl liegt genau in der Mitte?',
     numbers: [left, (left + right) / 2, right],
