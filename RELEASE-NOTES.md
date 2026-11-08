@@ -1,1 +1,1 @@
-Flink 1.6 bietet zehn Zahlenreihen pro Runde und zwei neue Übungen. Im Tausenderbuch springst du auf einer Hundertertafel. Bei den Stellenwerten liest und baust du Zahlen aus roten Hundertern, blauen Zehnern und grünen Einern. Jede neue Übung umfasst zehn Aufgaben mit einem Zeitziel von zehn Minuten.
+Flink 1.7 ergänzt im Tausenderbuch Sprungfolgen mit einem bis drei Pfeilen. Der Klassentest umfasst 30 Aufgaben in 20 Minuten mit Punkteauswertung und einem eigenen Notenschlüssel.

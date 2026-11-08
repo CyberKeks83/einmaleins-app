@@ -108,3 +108,39 @@ test('previous 20 task sequence rounds remain in history but do not compete with
  c.run("tab='recent';renderRecords()");
  assert.equal(c.elements.get('records').children[0].className,'record');
 });
+
+test('all book route steps stay inside the grid, including multi-arrow routes',()=>{
+ const {make}=require('../app/src/main/assets/tasks.js');
+ for(let i=0;i<200;i++){
+  const tasks=make('tausenderbuch-v1');
+  assert.deepEqual([...new Set(tasks.map(t=>t.moves.length))].sort(),[1,2,3]);
+  for(const task of tasks){
+   let row=Math.floor((task.start-task.first)/10),col=(task.start-task.first)%10;
+   for(const step of task.moves){
+    row+=step.row*step.count;col+=step.column*step.count;
+    assert(row>=0&&row<10&&col>=0&&col<10);
+   }
+   assert.equal(task.end,task.first+row*10+col);
+  }
+ }
+});
+test('exam has the requested mix, grades complete work and expires before accepting late answers',()=>{
+ const c=setup();
+ c.run("setMode(EXAM);start()");
+ assert.equal(c.run('tasks.length'),30);
+ assert.equal(c.run('tasks.filter(Array.isArray).length'),10);
+ assert.equal(c.run('tasks.filter(t=>t.blanks).length'),5);
+ assert.equal(c.run('tasks.filter(t=>t.kind==="read"||t.kind==="build").length'),10);
+ assert.equal(c.run('tasks.filter(t=>t.kind==="book").length'),5);
+ assert.equal(c.elements.get('time').textContent,'20:00');
+ c.run("for(let n=0;n<30;n++){const task=tasks[index];if(task.kind==='build'){marked=task.digits;submitPlace()}else if(task.blanks){entries=task.blanks.map(i=>String(task.numbers[i]));value=entries[0];key('Enter')}else{value=String(task.expected??(task[0]*task[1]));key('Enter')}}");
+ assert.equal(c.run('history[0].correct'),30);
+ assert.equal(c.run('history[0].grade'),'1');
+ c.run("start();value=String(tasks[0][0]*tasks[0][1]);key('Enter');examDeadline=Date.now();key('1')");
+ assert.equal(c.run('history[0].correct'),1);
+ assert.equal(c.run('history[0].unanswered'),29);
+ assert.equal(c.run('history[0].responses.length'),30);
+ assert.equal(c.run('history[0].ms'),1200000);
+ c.run("openReview(history[0])");
+ assert.equal(c.elements.get('reviewRows').children.length,29);
+});
