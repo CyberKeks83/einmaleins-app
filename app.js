@@ -27,6 +27,7 @@ function setMode(next){
   $(id).setAttribute('aria-pressed',String(mode===key));
  }
  const exercise=MODES[mode];
+ $('headlineCount').textContent=exercise.count+' Aufgaben.';
  $('welcomeTitle').textContent=exercise.name;
  $('welcomeText').textContent=exercise.count+' Aufgaben. '+exercise.intro;
  $('mathArt').textContent=exercise.art;
