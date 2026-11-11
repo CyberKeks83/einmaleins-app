@@ -4,7 +4,7 @@ const vm=require('node:vm');
 const fs=require('node:fs');
 function setup(stored='[]'){
  const elements=new Map(),memory=new Map([['flink-results-v1',stored]]);
- function el(){return {textContent:'',hidden:false,children:[],attrs:{},classList:{toggle(){},add(){},remove(){}},setAttribute(k,v){this.attrs[k]=v},replaceChildren(...v){this.children=v},append(...v){this.children.push(...v)},get lastElementChild(){return this.children.at(-1)},focus(){},showModal(){this.open=true},close(){this.open=false}}}
+ function el(){return {getContext(){return {clearRect(){},beginPath(){},moveTo(){},lineTo(){},stroke(){},fillText(){},fill(){}}},textContent:'',hidden:false,children:[],attrs:{},classList:{toggle(){},add(){},remove(){}},setAttribute(k,v){this.attrs[k]=v},replaceChildren(...v){this.children=v},append(...v){this.children.push(...v)},get lastElementChild(){return this.children.at(-1)},focus(){},showModal(){this.open=true},close(){this.open=false}}}
  const sounds=[];const context={FlinkAudio:{attach(){},startRound(){sounds.push('start')},finishRound(){sounds.push('finish')},stop(){sounds.push('stop')}},document:{getElementById(id){if(!elements.has(id))elements.set(id,el());return elements.get(id)},createElement:el,addEventListener(){}},localStorage:{getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v),removeItem:k=>memory.delete(k)},performance:{now:()=>1000},setInterval:()=>1,clearInterval(){},confirm:()=>true};
  vm.createContext(context);vm.runInContext(fs.readFileSync('app/src/main/assets/tasks.js','utf8'),context);vm.runInContext(fs.readFileSync('app/src/main/assets/app.js','utf8'),context);
  return {run:s=>vm.runInContext(s,context),memory,elements,sounds};
@@ -143,4 +143,19 @@ test('exam has the requested mix, grades complete work and expires before accept
  assert.equal(c.run('history[0].ms'),1200000);
  c.run("openReview(history[0])");
  assert.equal(c.elements.get('reviewRows').children.length,29);
+});
+
+test('worksheet covers the photographed formats, accepts alternative factor orders, and grades number-line choices',()=>{
+ const c=setup();
+ c.run("setMode(WORKSHEET);start()");
+ assert.equal(c.run('tasks.length'),30);
+ for(const kind of ['plus','minus','factors','divide','inverse','line-read','double','hundred','half','read','grid','neighbor','neighbor-ten','counting','line-mark']){
+  assert(c.run('tasks.some(t=>t.kind==='+JSON.stringify(kind)+')'),kind);
+ }
+ c.run("for(let n=0;n<30;n++){const task=tasks[index];if(task.kind==='line-mark'){$('lineChoices').children[task.marks.indexOf(task.expected)].onclick()}else if(task.blanks){entries=(task.solutions?.at(-1)??task.blanks.map(i=>task.numbers[i])).map(String);value=entries[0];key('Enter')}else{value=String(task.expected);key('Enter')}}");
+ assert.equal(c.run('history[0].correct'),30);
+ assert.equal(c.run('history[0].grade'),'1');
+ c.run("start();examDeadline=Date.now();key('1');openReview(history[0])");
+ assert.equal(c.run('history[0].unanswered'),30);
+ assert.equal(c.elements.get('reviewRows').children.length,30);
 });

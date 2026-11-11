@@ -34,3 +34,14 @@
 #examScale {padding:8px;text-align:center;font-size:.85rem}
 #examScale p {line-height:1.7}
 #examResult {font-size:1.4rem;font-weight:800;color:#174f3c}
+
+#numberLine {display:block;width:100%;height:auto;margin:6px auto}
+.line-choices {display:flex;justify-content:center;gap:8px;margin:6px auto 14px}
+.line-choices:empty {display:none}
+.line-choices button {min-width:44px;min-height:44px;border-radius:8px;border:1px solid #719985;background:#e8f3eb;color:#174f3c;font-weight:800}
+.sequence-cells.worksheet-layout {display:flex;flex-direction:column;gap:5px}
+.worksheet-row {display:flex;align-items:center;justify-content:center;gap:5px}
+.worksheet-row .sequence-cell,.worksheet-row>span:empty {min-width:0;width:4.2rem;max-width:24%;min-height:42px}
+.worksheet-row>span:not(.sequence-cell) {font-weight:700;text-align:center}
+
+.sequence-cells.worksheet-layout::before {display:none}

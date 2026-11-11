@@ -2,10 +2,12 @@
 const $=id=>document.getElementById(id),MODE='2bis9-v1',KEY='flink-results-v1';
 let history=[],storageOK=true;try{history=JSON.parse(localStorage.getItem(KEY)||'[]');if(!Array.isArray(history))history=[];history=history.filter(r=>Number.isFinite(r.ms)&&r.ms>=0&&Number.isInteger(r.errors)&&r.errors>=0&&Number.isFinite(r.date));localStorage.setItem(KEY,JSON.stringify(history));}catch{history=[];storageOK=false;$('storageNotice').hidden=false;}
 let mode=MODE,entries=[],activeBlank=0,marked=[0,0,0];
-const EXAM='klassentest-v1';
+const EXAM='klassentest-v1',WORKSHEET='arbeitsblatt-v1';
+function isTimedTest(){return mode===EXAM||mode===WORKSHEET;}
 const gradeScale=[[30,'1'],[29,'1−'],[28,'1–2'],[27,'2+'],[26,'2'],[25,'2−'],[24,'2–3'],[23,'3+'],[22,'3'],[21,'3−'],[20,'3–4'],[19,'4+'],[18,'4'],[17,'4−'],[16,'4–5'],[15,'5+'],[13,'5'],[11,'5−'],[9,'5–6'],[0,'6']];
 function gradeFor(points){return gradeScale.find(([minimum])=>points>=minimum)[1];}
 const MODES = {
+ [WORKSHEET]: {name:'Klassenarbeit üben',count:30,minutes:20,art:'✎',intro:'30 Aufgaben nach den Vorbereitungsblättern. Rechne, ergänze Lücken und arbeite mit Zahlenstrahl und Hundertertafel.'},
  [EXAM]: {name:'Klassentest',count:30,minutes:20,art:'✎',intro:'10 Einmaleins, 5 Zahlenreihen, 10 Stellenwerte und 5 Tausenderbuch. Maximal 20 Minuten. Jede vollständig richtige Aufgabe gibt einen Punkt.'},
  '2bis9-v1': {name:'Kleines Einmaleins', count:20, minutes:2, art:'7 × 8 = ?', intro:'Gemischte Aufgaben aus den Reihen 2 bis 9.'},
  'zahlenreihen-v1': {name:'Zahlenreihen bis 1000', count:10, minutes:10, art:'398 · 399 · ?', intro:'Zähle vorwärts und rückwärts, ergänze Reihen und finde die Mitte.'},
@@ -17,7 +19,7 @@ let responses=[],tasks=[],index=0,errors=0,value='',startTime=0,examDeadline=0,t
 const sound=typeof FlinkAudio!=='undefined'?FlinkAudio:{attach(){},startRound(){},finishRound(){},stop(){}};
 sound.attach();
 const time=ms=>{const s=Math.floor(ms/1000);return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')};
-function paintTime(ms){if(mode===EXAM){const remaining=time(Math.ceil(Math.max(0,timeLimit()-ms)/1000)*1000);$('time').textContent=remaining;$('timer').classList.toggle('over',ms>=timeLimit());$('timer').setAttribute('aria-label','Verbleibende Zeit '+remaining);return;}$('time').textContent=time(ms);$('timer').classList.toggle('over',ms>timeLimit());$('timer').setAttribute('aria-label','Vergangene Zeit '+time(ms)+(ms>timeLimit()?', über '+limitMinutes()+' Minuten':''));}
+function paintTime(ms){if(isTimedTest()){const remaining=time(Math.ceil(Math.max(0,timeLimit()-ms)/1000)*1000);$('time').textContent=remaining;$('timer').classList.toggle('over',ms>=timeLimit());$('timer').setAttribute('aria-label','Verbleibende Zeit '+remaining);return;}$('time').textContent=time(ms);$('timer').classList.toggle('over',ms>timeLimit());$('timer').setAttribute('aria-label','Vergangene Zeit '+time(ms)+(ms>timeLimit()?', über '+limitMinutes()+' Minuten':''));}
 function paintDots(){const nodes=Array.from({length:roundCount()},(_,i)=>{const el=document.createElement('span');el.className='dot'+(i<index?' done':i===index&&running?' current':'');return el});$('dots').replaceChildren(...nodes);}
 function isSequence(){return Array.isArray(tasks[index]?.blanks);}
 function limitMinutes(){return MODES[mode].minutes;}
@@ -27,7 +29,7 @@ function timeLimit(){return limitMinutes()*60_000;}
 function setMode(next){
  if(running)return;
  mode=next;
- for(const [id,key] of Object.entries({multiplyMode:MODE,sequenceMode:'zahlenreihen-v1',bookMode:'tausenderbuch-v1',placeMode:'stellenwert-v1',examMode:EXAM})){
+ for(const [id,key] of Object.entries({multiplyMode:MODE,sequenceMode:'zahlenreihen-v1',bookMode:'tausenderbuch-v1',placeMode:'stellenwert-v1',examMode:EXAM,worksheetMode:WORKSHEET})){
   $(id).setAttribute('aria-pressed',String(mode===key));
  }
  const exercise=MODES[mode];
@@ -36,9 +38,9 @@ function setMode(next){
  $('welcomeText').textContent=exercise.count+' Aufgaben. '+exercise.intro;
  $('mathArt').textContent=exercise.art;
  $('finished').hidden=true;$('welcome').hidden=false;$('progressLabel').textContent='Bereit, wenn du es bist.';index=0;paintDots();paintTime(0);
- $('goalTime').textContent=mode===EXAM?'Zeitlimit 20:00':'Bis '+limitMinutes()+':00 grün';
- $('goalAfter').hidden=mode===EXAM;
- $('examScale').hidden=mode!==EXAM;
+ $('goalTime').textContent=isTimedTest()?'Zeitlimit 20:00':'Bis '+limitMinutes()+':00 grün';
+ $('goalAfter').hidden=isTimedTest();
+ $('examScale').hidden=!isTimedTest();
  $('gradeScale').textContent=gradeScale.map(([points,grade])=>points+' P.: '+grade).join(' · ');
  $('bestTimeLimit').textContent='unter '+limitMinutes()+' Min.';
  $('recordNote').textContent='Tippe auf eine Runde für die Auswertung. Für die Bestenliste brauchst du '+roundCount()+' richtige Aufgaben in weniger als '+limitMinutes()+' Minuten.';
@@ -46,16 +48,74 @@ function setMode(next){
 }
 function drawSequence(){
  const task=tasks[index],container=$('sequenceCells');container.replaceChildren();
+ container.classList.toggle('worksheet-layout',Boolean(task.layout));
  container.classList.toggle('midpoint',task.kind==='middle');
- task.numbers.forEach((number,i)=>{
+ function makeCell(i){
+  const number=task.numbers[i];
   const blank=task.blanks.indexOf(i),cell=document.createElement(blank<0?'span':'button');
   cell.className='sequence-cell'+(blank<0?' given':blank===activeBlank?' active':'');
   cell.textContent=blank<0?String(number):entries[blank]||'?';
   if(blank>=0){cell.type='button';cell.setAttribute('aria-label','Fehlende Zahl '+(blank+1)+', '+(entries[blank]||'noch leer'));cell.setAttribute('aria-pressed',String(blank===activeBlank));cell.onclick=()=>{activeBlank=blank;value=entries[blank];drawSequence();};}
-  container.append(cell);
- });
+  return cell;
+ }
+ if(task.layout){
+  for(const tokens of task.layout){
+   const row=document.createElement('div');
+   row.className='worksheet-row';
+   for(const token of tokens){
+    if(Number.isInteger(token)){row.append(makeCell(token));continue;}
+    const label=document.createElement('span');label.textContent=token;row.append(label);
+   }
+   container.append(row);
+  }
+ }else task.numbers.forEach((_,i)=>container.append(makeCell(i)));
  $('feedback').textContent='Zahl '+(activeBlank+1)+' von '+task.blanks.length+' · Mit ✓ weiter.';
 }
+function drawNumberLine(task){
+ const canvas=$('numberLine');
+ const context=canvas.getContext('2d');
+ const left=34,right=686,y=56;
+ const position=n=>left+(right-left)*(n-task.first)/(task.last-task.first);
+ const reading=task.kind==='line-read';
+ context.clearRect(0,0,720,116);
+ context.strokeStyle='#243e34';
+ context.fillStyle='#243e34';
+ context.textAlign='center';
+ context.font='26px system-ui';
+ context.beginPath();context.moveTo(left,y);context.lineTo(right,y);context.stroke();
+ function tick(n,height,label){
+  const x=position(n);
+  context.beginPath();context.moveTo(x,y-height);context.lineTo(x,y+height);context.stroke();
+  if(label!==undefined)context.fillText(label,x,y+height+28);
+ }
+ const marks=$('lineChoices');
+ marks.replaceChildren();
+ if(reading){
+  for(let n=task.first;n<=task.last;n++)tick(n,n%10===0?13:n%5===0?8:5,n%10===0?String(n):undefined);
+  const x=position(task.expected);
+  context.fillStyle='#a82125';
+  context.beginPath();context.moveTo(x-8,29);context.lineTo(x+8,29);context.lineTo(x,y-3);context.fill();
+  const lower=Math.floor(task.expected/10)*10;
+  canvas.setAttribute('aria-label','Zahlenstrahl von '+task.first+' bis '+task.last+'. Der Pfeil steht '+(task.expected-lower)+' kleine Striche rechts von '+lower+'.');
+ }else{
+  tick(0,13,'0');tick(500,13,'500');tick(1000,13,'1000');
+  task.marks.forEach((n,i)=>{
+   const letter='ABCD'[i];
+   tick(n,10);
+   context.fillText(letter,position(n),32);
+   const button=document.createElement('button');
+   button.type='button';button.textContent=letter;
+   button.setAttribute('aria-label','Markierung '+letter);
+   button.onclick=()=>{
+    if(!running||expireExam()||tasks[index]!==task)return;
+    submitAnswer({title:task.title,answer:letter,expected:lineSolution(task),correct:n===task.expected});
+   };
+   marks.append(button);
+  });
+  canvas.setAttribute('aria-label','Zahlenstrahl von 0 bis 1000 mit vier Markierungen von A bis D.');
+ }
+}
+function lineSolution(task){return 'ABCD'[task.marks.indexOf(task.expected)]+' ('+task.expected+')';}
 function drawBook(task){
  const route=$('bookRoute');
  route.hidden=task.inverse;
@@ -134,13 +194,17 @@ function showQuestion(){
  const isBook=task.kind==='book';
  const isPlace=task.kind==='build'||task.kind==='read';
  const building=task.kind==='build';
+ const marking=task.kind==='line-mark';
+ const isLine=marking||task.kind==='line-read';
+ $('linePanel').hidden=!isLine;
+ if(isLine)drawNumberLine(task);
  $('sequenceCells').hidden=!isSequence();
- $('answer').hidden=isSequence()||building;
+ $('answer').hidden=isSequence()||building||marking;
  $('question').classList.toggle('sequence-title',mode!==MODE);
  $('bookPanel').hidden=!isBook;
  $('placePanel').hidden=!isPlace;
- $('keypad').hidden=building;
- $('feedback').hidden=building;
+ $('keypad').hidden=building||marking;
+ $('feedback').hidden=building||marking;
  $('submitPlace').hidden=!building;
  if(isBook)drawBook(task);
  if(isPlace){marked=[0,0,0];drawPlaces(task);}
@@ -155,17 +219,17 @@ function start(){
  if(!$('answer').hidden)$('answer').focus({preventScroll:true});
 }
 function elapsed(){
- return mode===EXAM?Math.max(0,timeLimit()-(examDeadline-Date.now())):performance.now()-startTime;
+ return isTimedTest()?Math.max(0,timeLimit()-(examDeadline-Date.now())):performance.now()-startTime;
 }
 function expireExam(){
- if(!running||mode!==EXAM||Date.now()<examDeadline)return false;
+ if(!running||!isTimedTest()||Date.now()<examDeadline)return false;
  for(const task of tasks.slice(index)){
   if(Array.isArray(task.blanks)){
-   responses.push({numbers:task.numbers,blanks:task.blanks,answers:[],expected:task.blanks.map(i=>task.numbers[i]),correct:false,unanswered:true});
+   responses.push({title:reviewTaskTitle(task),layout:task.layout,numbers:task.numbers,blanks:task.blanks,answers:[],expected:task.blanks.map(i=>task.numbers[i]),correct:false,unanswered:true});
   }else if(Array.isArray(task)){
    responses.push({a:task[0],b:task[1],correct:false,unanswered:true});
   }else{
-   responses.push({title:reviewTaskTitle(task),expected:task.expected,correct:false,unanswered:true});
+   responses.push({title:reviewTaskTitle(task),expected:task.kind==='line-mark'?lineSolution(task):task.expected,correct:false,unanswered:true});
   }
  }
  finish(true);
@@ -182,14 +246,14 @@ function finish(timedOut=false){
  $('finishTitle').textContent=eligible&&ms<oldBest?'Neue persönliche Bestzeit!':'Deine Auswertung';
  $('finishText').textContent=timedOut?'Die 20 Minuten sind vorbei. '+unanswered+' Aufgaben blieben offen.':correct===roundCount()?'Alle '+roundCount()+' Aufgaben richtig beantwortet.':'Alle '+roundCount()+' Aufgaben beantwortet.';
  $('summary').textContent=time(ms);$('summary').classList.toggle('over',ms>timeLimit());
- $('examResult').hidden=mode!==EXAM;
- $('examResult').textContent=mode===EXAM?correct+' / 30 Punkte · Note '+gradeFor(correct):'';
+ $('examResult').hidden=!isTimedTest();
+ $('examResult').textContent=isTimedTest()?correct+' / 30 Punkte · Note '+gradeFor(correct):'';
  $('rightCount').textContent=correct;$('wrongCount').textContent=errors;$('accuracy').textContent=Math.round(correct/roundCount()*100)+' %';
  $('reviewSummary').textContent=unanswered?'Offene Aufgaben geben 0 Punkte.':errors===0?'Alle Antworten sind richtig.':errors+' '+(errors===1?'Aufgabe kannst':'Aufgaben kannst')+' du noch üben.';
  $('detailScore').hidden=mode!=='zahlenreihen-v1';if(mode==='zahlenreihen-v1'){const all=responses.flatMap(r=>r.answers.map((v,i)=>v===r.expected[i]));$('detailScore').textContent=all.filter(Boolean).length+' von '+all.length+' einzelnen Zahlen richtig. Eine Reihe ist richtig, wenn alle Lücken stimmen.';}
- $('recordText').hidden=mode===EXAM;
+ $('recordText').hidden=isTimedTest();
  $('recordText').textContent=eligible?'Deine Zeit steht jetzt in der Bestenliste.':errors>0?'Für die Bestenliste: unter '+limitMinutes()+' Minuten und alle '+roundCount()+' richtig.':'Dein Ziel: weniger als '+limitMinutes()+' Minuten.';
- const result={ms,errors,correct,date:Date.now(),mode,total:roundCount(),...(mode===EXAM?{grade:gradeFor(correct),unanswered}:{}),responses:responses.map(r=>({...r}))};
+ const result={ms,errors,correct,date:Date.now(),mode,total:roundCount(),...(isTimedTest()?{grade:gradeFor(correct),unanswered}:{}),responses:responses.map(r=>({...r}))};
  history.unshift(result);$('viewResults').onclick=()=>openReview(result);history=history.slice(0,500);
  try{localStorage.setItem(KEY,JSON.stringify(history))}catch{storageOK=false;$('storageNotice').hidden=false;}
  renderRecords();$('again').focus({preventScroll:true});
@@ -208,11 +272,13 @@ function submitPlace(){
  submitAnswer({title:task.title,answer,expected:task.expected,correct:answer===task.expected});
 }
 function reviewTaskTitle(task){
+ if(task.kind==='grid')return task.title+' Gegeben: '+task.anchor+'. Lücken zeilenweise.';
+ if(task.kind==='line-read')return task.title+' Zahlenstrahl '+task.first+' bis '+task.last+'.';
  if(task.kind==='read')return task.title+' '+task.digits.map((count,i)=>count+' '+placeNames[i]).join(', ');
  return task.instruction??task.title;
 }
 function key(k){
- if(!running||expireExam()||tasks[index].kind==='build')return;
+ if(!running||expireExam()||['build','line-mark'].includes(tasks[index].kind))return;
  if(/^\d$/.test(k)){
   if(value.length<(mode===MODE?3:4))value+=k;
   if(isSequence()){entries[activeBlank]=value;drawSequence();}else $('answer').textContent=value||'?';
@@ -223,8 +289,8 @@ function key(k){
    const next=entries.findIndex((v,i)=>i>activeBlank&&v==='');const missing=next>=0?next:entries.findIndex(v=>v==='');
    if(missing>=0){activeBlank=missing;value=entries[missing];drawSequence();return;}
    const task=tasks[index],answers=entries.map(Number),expected=task.blanks.map(i=>task.numbers[i]);
-   const correct=answers.every((v,i)=>v===expected[i]);
-   submitAnswer({kind:task.kind,title:task.title,numbers:[...task.numbers],blanks:[...task.blanks],answers,expected,correct});
+   const correct=(task.solutions??[expected]).some(solution=>answers.every((v,i)=>v===solution[i]));
+   submitAnswer({kind:task.kind,title:reviewTaskTitle(task),layout:task.layout,numbers:[...task.numbers],blanks:[...task.blanks],answers,expected:correct?answers:expected,correct});
   }else if(Array.isArray(tasks[index])){
    const [a,b]=tasks[index],answer=Number(value),correct=answer===a*b;
    submitAnswer({a,b,answer,correct});
@@ -258,7 +324,7 @@ function renderReview(){
  $('reviewEmpty').hidden=!reviewRound||details.length!==savedCount(reviewRound)||visible.length>0;
  for(const r of visible){
   const row=document.createElement('tr');
-  const columns=r.numbers?[r.numbers.map((v,i)=>r.blanks.includes(i)?'?':v).join(' · '),r.answers.join(', ')+(r.correct?' ✓':' ✕'),r.expected.join(', ')]:[r.title??(r.a+' × '+r.b),String(r.answer)+(r.correct?' ✓':' ✕'),String(r.expected??(r.a*r.b))];
+  const columns=r.numbers?[r.layout?r.title+' '+r.layout.map(row=>row.map(token=>Number.isInteger(token)?(r.blanks.includes(token)?'?':r.numbers[token]):token).join(' ')).join(' / '):r.numbers.map((v,i)=>r.blanks.includes(i)?'?':v).join(' · '),r.answers.join(', ')+(r.correct?' ✓':' ✕'),r.expected.join(', ')]:[r.title??(r.a+' × '+r.b),String(r.answer)+(r.correct?' ✓':' ✕'),String(r.expected??(r.a*r.b))];
   if(r.unanswered)columns[1]='Offen';
   for(const text of columns){const cell=document.createElement('td');cell.textContent=text;row.append(cell)}
   row.className=r.correct?'answer-correct':'answer-wrong';$('reviewRows').append(row);
@@ -303,4 +369,5 @@ $('bookMode').onclick=()=>setMode('tausenderbuch-v1');
 $('placeMode').onclick=()=>setMode('stellenwert-v1');
 $('submitPlace').onclick=submitPlace;
 $('examMode').onclick=()=>setMode(EXAM);
+$('worksheetMode').onclick=()=>setMode(WORKSHEET);
 setMode(MODE);

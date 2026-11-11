@@ -1,1 +1,1 @@
-Flink 1.7 ergänzt im Tausenderbuch Sprungfolgen mit einem bis drei Pfeilen. Der Klassentest umfasst 30 Aufgaben in 20 Minuten mit Punkteauswertung und einem eigenen Notenschlüssel.
+Flink 1.8 ergänzt einen Übungstest nach den Arbeitsblättern mit 30 Aufgaben in 20 Minuten. Er enthält Plus, Minus, Malaufgaben, Geteiltaufgaben und Umkehraufgaben sowie Zahlenstrahlen, Verdoppeln, Halbieren, Ergänzen bis 100, Stellenwerte, Hundertertafel, Nachbarn und Zählfolgen.
