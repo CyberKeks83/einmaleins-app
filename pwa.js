@@ -1,6 +1,6 @@
 'use strict';
 (()=>{
- const CACHE='flink-web-1.7.0',status=document.getElementById('offlineStatus');
+ const CACHE='flink-web-1.8.0',status=document.getElementById('offlineStatus');
  let cached=false,installPrompt=null,reloading=false;
  const updateButton=document.getElementById('updateApp');
  navigator.serviceWorker?.addEventListener('controllerchange',()=>{if(reloading)location.reload()});
@@ -21,7 +21,7 @@
   return navigator.serviceWorker.ready;
  }).then(async()=>{
   const keys=await caches.keys();if(!keys.includes(CACHE))return;
-  const cache=await caches.open(CACHE);const needed=['index.html','style.css?v=1.7','app.js?v=1.7','tasks.js?v=1.7','audio.js?v=1.7','pwa.js?v=1.7','manifest.webmanifest','icon.svg','icon-180.png','icon-192.png','icon-512.png'];
+  const cache=await caches.open(CACHE);const needed=['index.html','style.css?v=1.8','app.js?v=1.8','tasks.js?v=1.8','audio.js?v=1.8','pwa.js?v=1.8','manifest.webmanifest','icon.svg','icon-180.png','icon-192.png','icon-512.png'];
   const matches=await Promise.all(needed.map(file=>cache.match(new URL(file,location.href))));cached=matches.every(Boolean);paint();
  }).catch(()=>{status.textContent='Im Browser nutzbar · Offline Speichern nicht verfügbar';});
 })();

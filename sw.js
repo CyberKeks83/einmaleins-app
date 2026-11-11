@@ -1,5 +1,5 @@
 'use strict';
-const CACHE='flink-web-1.7.0',FILES=['./index.html','./style.css?v=1.7','./app.js?v=1.7','./tasks.js?v=1.7','./audio.js?v=1.7','./pwa.js?v=1.7','./manifest.webmanifest','./icon.svg','./icon-180.png','./icon-192.png','./icon-512.png'];
+const CACHE='flink-web-1.8.0',FILES=['./index.html','./style.css?v=1.8','./app.js?v=1.8','./tasks.js?v=1.8','./audio.js?v=1.8','./pwa.js?v=1.8','./manifest.webmanifest','./icon.svg','./icon-180.png','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES)));});
 self.addEventListener('message',event=>{if(event.data?.type==='ACTIVATE_UPDATE')self.skipWaiting();});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('flink-web-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
